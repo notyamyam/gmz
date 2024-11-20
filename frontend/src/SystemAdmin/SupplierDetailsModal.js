@@ -13,6 +13,7 @@ function SupplierDetailsModal({ isOpen, onClose, supplier }) {
     }, [isOpen, supplier]);
 
     const fetchSupplierDetails = async (supplyId) => {
+        console.log(supplyId);
         try {
             const response = await axios.get(`${apiUrl}/supDeli/${supplyId}`);
             setSupplierDetails(response.data);

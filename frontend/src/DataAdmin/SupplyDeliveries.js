@@ -119,7 +119,7 @@ function SupplyDeliveries() {
     }, [searchQuery]); // Trigger on searchQuery change
 
     return (
-        <div className="container">
+        <div className="container1">
             <Sidebar />
             <Header />
             <div className="main-content">
@@ -131,7 +131,7 @@ function SupplyDeliveries() {
                                 <i className="fa-solid fa-add"></i> Add
                             </button>
                         </div>
-                        <div className="search-container">
+                        <div className="search-container1">
                             <div className="search-wrapper">
                                 <label>
                                     <i className="fa-solid fa-magnifying-glass search-icon"></i>

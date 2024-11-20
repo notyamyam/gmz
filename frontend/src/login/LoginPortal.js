@@ -26,6 +26,11 @@ const LoginPortal = () => {
         } else if (res.data.user.access === 3) {
           navigate("/sales-admin/dashboard");
         }
+
+        localStorage.setItem('username' , res.data.user.username);
+        localStorage.setItem('access' , res.data.user.access);
+
+        window.location.reload();
       })
       .catch((err) => {
         alert("Credential Incorrect.");

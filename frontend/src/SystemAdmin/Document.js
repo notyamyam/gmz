@@ -4,17 +4,21 @@ import Header from "../BG/SystemAdminHeader";
 import Sidebar from "../BG/SystemAdminSidebar";
 import axios from "axios";
 import AddDocumentModal from "./AddDocumentModal";
-import { toast } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify"; // Import ToastContainer and toast
 import apiUrl from "../ApiUrl/apiUrl";
 import moment from "moment";
 import ViewPDFModal from "./ViewPdfModal";
+import EditDocumentModal from "./EditDocumentModal";
 
 function Document() {
   const [isAddModalOpen, setAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [isViewModalOpen, setViewModalOpen] = useState(false); // State to control view modal
   const [pdfFilePath, setPdfFilePath] = useState(""); // Store the file path of the PDF
-
+  const [isEditModalOpen, setEditModalOpen] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(null);
+  const [itemToDelete , setItemToDelete] = useState(null);
   // Fetch all documents
   const fetchDocuments = async () => {
     try {
@@ -35,6 +39,29 @@ function Document() {
       toast.error("Failed to add document.");
     }
   };
+  // Delete a document
+  const deleteDocument = async (id) => {
+  
+      try {
+        await axios.delete(`${apiUrl}/documents/${id}`);
+        fetchDocuments();
+        toast.success("Document deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        toast.error("Failed to delete document.");
+      }
+    
+  };
+
+  const editDocument = (document) => {
+    setCurrentDocument(document);
+    setEditModalOpen(true);
+  };
+
+  const updateDocument = async () => {
+    fetchDocuments(); // Refresh documents after editing
+    toast.success("Document updated successfully!");
+  };
 
   // Open the PDF modal
   const viewPDF = (filePath) => {
@@ -48,7 +75,7 @@ function Document() {
   }, [documents]);
 
   return (
-    <div className="container">
+    <div className="container1">
       <Sidebar />
       <Header />
       <div className="main-content">
@@ -87,10 +114,19 @@ function Document() {
                         >
                           <i className="fa-solid fa-eye"></i>
                         </button>
-                        <button className="edit-btn">
+                        <button
+                          className="edit-btn"
+                          onClick={() =>{
+                            setItemToDelete(doc.id);
+                            setDeleteModalOpen(true);
+                          }}
+                        >
                           <i className="fa-solid fa-trash-can"></i>
                         </button>
-                        <button className="btn">
+                        <button
+                          className="btn"
+                          onClick={() => editDocument(doc)}
+                        >
                           <i className="fa-solid fa-pen-to-square"></i>
                         </button>
                       </div>
@@ -113,6 +149,38 @@ function Document() {
         onClose={() => setViewModalOpen(false)}
         filePath={pdfFilePath} // Pass the file path to the modal
       />
+      <EditDocumentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onEdit={updateDocument}
+        document={currentDocument}
+      />
+      {isDeleteModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Confirm Deletion</h2>
+            <p>Are you sure you want to delete this document?</p>
+            <div className="modal-buttons">
+              <button
+                className="btn"
+                onClick={async () => {
+                  await deleteDocument(itemToDelete);
+                  setDeleteModalOpen(false);
+                }}
+              >
+                Confirm
+              </button>
+              <button
+                className=""
+                onClick={() => setDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+       <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import moment from "moment";
 
 function Dashboard() {
     return (
-        <div className="container">
+        <div className="container1">
             <Sidebar />
             <Header />
         </div>

@@ -107,7 +107,7 @@ function Order() {
     };
 
     return (
-        <div className="container">
+        <div className="container1">
             <Sidebar />
             <Header />
             <div className='main-content'>
@@ -119,7 +119,7 @@ function Order() {
                                 <i className="fa-solid fa-add"></i> Add
                             </button>
                         </div>
-                        <div className="search-container">
+                        <div className="search-container1">
                             <div className="search-wrapper">
                                 <label>
                                     <i className="fa-solid fa-magnifying-glass search-icon"></i>
@@ -192,7 +192,7 @@ function Order() {
                                                     )}
                                                 </td>
                                                 <td>₱{order.price}</td>
-                                                <td className="button-container">
+                                                <td className="button-container1">
                                                     <button className="edit-btn" onClick={() => handleEditOrder(order)}>
                                                         <i className="fa-solid fa-edit"></i>
                                                     </button>

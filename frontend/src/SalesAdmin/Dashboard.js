@@ -148,7 +148,7 @@ function Dashboard() {
     };
 
     return (
-        <div className="container">
+        <div className="container1">
             <Sidebar />
             <Header />
             <div className="main-content">
@@ -163,7 +163,7 @@ function Dashboard() {
                     </select>
                 </div>
 
-                <div className="chart-container">
+                <div className="chart-container1">
                     {chartUrl && (
                         <img src={chartUrl} alt="Delivered Orders Chart" style={{ maxWidth: '80%', height: 'auto' }} />
                     )}

@@ -4,28 +4,33 @@ import "../css/AddItemModal.css";
 import apiUrl from "../ApiUrl/apiUrl";
 import { toast } from "react-toastify";
 
-const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
+const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
   const [documentName, setDocumentName] = useState("");
   const [documentFile, setDocumentFile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [dateUploaded, setDateUploaded] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [description, setDescription] = useState("");
 
-  // Fetch inventory categories from backend when the modal opens
+  // Pre-fill document details when the modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && document) {
+      setDocumentName(document.documentName);
+      setSelectedCategory(document.category);
+      setExpirationDate(document.expirationDate);
+      setDescription(document.description);
+
+      // Fetch categories
       axios
         .get(`${apiUrl}/categories/document`)
         .then((response) => {
           setCategories(response.data);
         })
         .catch((error) => {
-          console.error("Error fetching inventory categories:", error);
+          console.error("Error fetching categories:", error);
         });
     }
-  }, [isOpen]);
+  }, [isOpen, document]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -39,57 +44,51 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!documentFile) {
-      alert("Please upload a document.");
-      return;
-    }
-
     const formData = new FormData();
     formData.append("documentName", documentName);
-    formData.append("documentFile", documentFile);
+    if (documentFile) {
+      formData.append("documentFile", documentFile); // Only append the file if updated
+    }
     formData.append("category", selectedCategory);
-    formData.append("dateUploaded", dateUploaded);
     formData.append("expirationDate", expirationDate);
     formData.append("description", description);
 
-    await axios
-      .post(`${apiUrl}/documents/upload`, formData, {
+    try {
+      await axios.put(`${apiUrl}/documents/${document.id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      })
-      .then((res) => {
-        toast.success("Document uploaded successfully!");
-        console.log(res);
-        onClose();
-      })
-      .catch((error) => {
-        console.error("Error uploading document:", error);
-        alert(error.response.data.error);
       });
+    
+      onEdit(); // Refresh the document list
+      onClose(); // Close the modal
+    } catch (error) {
+      console.error("Error updating document:", error);
+      toast.error("Failed to update document.");
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div id="addModal" className="modal-overlay">
-    
-        <h2>Add New Document</h2>
+    <div id="editModal" className="modal-overlay">
+      <div className="modal-content">
+        <h2>Edit Document</h2>
         <form onSubmit={handleSubmit}>
-          <label>File Name</label>
+          <label>Document Name</label>
           <input
             type="text"
             placeholder="Document Name"
-            disabled
             value={documentName}
+            onChange={(e) => setDocumentName(e.target.value)}
+            disabled={!documentFile} // Allow editing only if a new file is uploaded
             required
           />
-          <label>Upload File</label>
+           <label>Upload new file</label>
           <input
             type="file"
             accept="application/pdf"
             onChange={handleFileChange}
-            required
           />
           <label>Category</label>
           <select
@@ -106,15 +105,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
               </option>
             ))}
           </select>
-          <label>Date Uploaded</label>
-          <input
-            type="date"
-            placeholder="Date Uploaded"
-            value={dateUploaded}
-            onChange={(e) => setDateUploaded(e.target.value)}
-            required
-          />
-          <label>Date expiry</label>
+          <label>New Expiration Date</label>
           <input
             type="date"
             placeholder="Expiration Date"
@@ -130,15 +121,15 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
             required
           ></textarea>
           <hr></hr>
-          <button type="submit">Add Document</button>
+          <button type="submit">Save Changes</button>
           <hr></hr>
           <button type="button" onClick={onClose}>
             Cancel
           </button>
         </form>
-      
+      </div>
     </div>
   );
 };
 
-export default AddDocumentModal;
+export default EditDocumentModal;

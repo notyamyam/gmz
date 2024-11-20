@@ -12,14 +12,14 @@ body {
   box-sizing: border-box;
 }
 
-.container {
+.container1 {
   display: flex;
   flex-direction: column; /* Stack the header and content vertically */
   min-height: 100vh; /* Full height viewport */
 }
 
 /* Sidebar Styling */
-.container .sidebar {
+.container1 .sidebar {
   flex-grow: 1; /* Sidebar will expand to fill available height */
   background-color: #FF2828;
   width: 200px;
@@ -32,44 +32,44 @@ body {
   left: 0;
 }
 
-.container .sidebar h2 {
+.container1 .sidebar h2 {
   text-align: center;
   margin-bottom: 10px;
 }
 
-.container .sidebar ul {
+.container1 .sidebar ul {
   list-style: none; /* Remove bullets */
   padding: 0; /* Remove default padding */
   margin: 0; /* Remove default margin */
 }
 
-.container .sidebar ul li {
+.container1 .sidebar ul li {
   padding: 15px;
   border-bottom: 1px solid #bdb8d7;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.container .sidebar ul li a {
+.container1 .sidebar ul li a {
   text-decoration: none;
   color: #FFFFFF;
   display: block;
 }
 
-.container .sidebar ul li a .fa-solid {
+.container1 .sidebar ul li a .fa-solid {
   width: 25px;
 }
 
-.container .sidebar ul li:hover {
+.container1 .sidebar ul li:hover {
   background-color: #FF9393;
 }
 
-.container .sidebar ul li:hover a {
+.container1 .sidebar ul li:hover a {
   color: #fff;
 }
 
 /* NAVBAR Styling */
-.container .header {
+.container1 .header {
   width: calc(100% - 200px); /* Full width minus sidebar width */
   margin-left: 200px; /* Align with sidebar */
   position: fixed; /* Fixed header */
@@ -84,7 +84,7 @@ body {
   font-family: 'Poppins', sans-serif;
 }
 
-.container .header .dropdown {
+.container1 .header .dropdown {
   display: flex;
   margin-left: auto;
   gap: 10px;
@@ -178,14 +178,14 @@ body {
     gap: 10px; /* Adjusts space between items */
   }
 
-  .search-container{
+  .search-container1{
     display: flex;
     align-items: center;
     margin-left: auto;
     gap: 5px; /* Adjusts space between items */
   }
 
-  .search-container i{
+  .search-container1 i{
     margin-top: 5px;
   }
 
@@ -228,7 +228,6 @@ body {
 .table-list{
   overflow-y: auto; /* Enable vertical scrolling */  
   height: 500px; /* Adjust height as needed */
-  border: 1px solid #e0e4e8;
   font-family: 'Open Sans', sans-serif;
   font-size: 12px;
 }
@@ -545,26 +544,26 @@ select:hover {
 
 @media (max-width: 768px) {
   /* Sidebar - collapse into a hamburger */
-  .container .sidebar {
+  .container1 .sidebar {
     width: 60px;
     padding: 10px 0;
   }
   
-  .container .sidebar h2 {
+  .container1 .sidebar h2 {
     display: none; /* Hide the sidebar title */
   }
 
-  .container .sidebar ul li {
+  .container1 .sidebar ul li {
     text-align: center;
     padding: 10px 0;
   }
 
-  .container .sidebar ul li a .fa-solid {
+  .container1 .sidebar ul li a .fa-solid {
     width: auto; /* Adjust icon width */
   }
   
   /* Main content adjusts to sidebar size */
-  .container .header {
+  .container1 .header {
     width: calc(100% - 60px);
     margin-left: 60px;
   }
@@ -575,7 +574,7 @@ select:hover {
   }
 
   /* Adjust header padding */
-  .container .header {
+  .container1 .header {
     padding: 10px;
   }
   
@@ -624,12 +623,12 @@ select:hover {
 
 @media (max-width: 480px) {
   /* Sidebar becomes fully hidden */
-  .container .sidebar {
+  .container1 .sidebar {
     display: none;
   }
   
   /* Header takes full width */
-  .container .header {
+  .container1 .header {
     width: 100%;
     margin-left: 0;
     padding: 10px 5px;

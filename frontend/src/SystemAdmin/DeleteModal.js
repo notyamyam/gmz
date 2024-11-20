@@ -12,8 +12,7 @@ if (!isOpen) return null;
                 <p>This action cannot be undone.</p>
                 <button onClick={onConfirm} className="modalBtn confirm">Confirm</button>
                 <button onClick={onClose} className="modalBtn cancel">Cancel</button>
-            
-            
+        
         </div>
     </div>
     

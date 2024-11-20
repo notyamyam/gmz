@@ -5,6 +5,8 @@ const mysql = require("mysql");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
+
+const fs = require("fs");
 // const bcrypt, { compare } = require('bcrypt');
 // const cookieParser = require('cookie-parser');
 const moment = require("moment");
@@ -114,7 +116,7 @@ app.post("/api/addaccount", async (req, res) => {
 });
 
 app.post("/api/editaccount/:id", async (req, res) => {
-  console.log(req.body);
+
   const id = req.params.id;
   const username = req.body.username;
   const password = req.body.password;
@@ -131,7 +133,7 @@ app.post("/api/editaccount/:id", async (req, res) => {
 });
 
 app.delete("/api/deleteaccount/:id", async (req, res) => {
-  console.log(req.body);
+
   const id = req.params.id;
 
   const sql = `DELETE FROM tblusers WHERE id = ${id}`;
@@ -260,6 +262,130 @@ app.get("/api/documents/view/:filename", (req, res) => {
     }
   });
 });
+
+
+app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
+  const { id } = req.params;
+  const { documentName, category, expirationDate, description } = req.body;
+  let newFilePath = null;
+
+  // If a new file is uploaded, set the new file path
+  if (req.file) {
+    newFilePath = `/uploads/${req.file.filename}`;
+  }
+
+  // Query to get the current file path
+  const getFileQuery = `SELECT filePath FROM tbldocument WHERE id = ?`;
+
+  db.query(getFileQuery, [id], (err, rows) => {
+    if (err) {
+      console.error("Database query error:", err);
+      return res.status(500).json({ error: "Failed to fetch document details." });
+    }
+
+    const oldFilePath = rows[0]?.filePath; // Get the current file path from the database
+
+    // Update the database with new values
+    const updateQuery = `
+      UPDATE tbldocument
+      SET documentName = ?, category = ?, expirationDate = ?, description = ?
+      ${newFilePath ? ", filePath = ?" : ""}
+      WHERE id = ?`;
+
+    const queryParams = newFilePath
+      ? [documentName, category, expirationDate, description, newFilePath, id]
+      : [documentName, category, expirationDate, description, id];
+
+    db.query(updateQuery, queryParams, (updateErr, result) => {
+      if (updateErr) {
+        console.error("Database update error:", updateErr);
+        return res.status(500).json({ error: "Database update failed." });
+      }
+
+      // Delete the old file if a new file was uploaded and the old file exists
+      if (newFilePath && oldFilePath) {
+        const fullOldFilePath = path.join(__dirname, oldFilePath); // Construct the full path
+       
+
+        // Check if the file exists before attempting deletion
+        fs.access(fullOldFilePath, fs.constants.F_OK, (accessErr) => {
+          if (accessErr) {
+        
+          } else {
+            fs.unlink(fullOldFilePath, (unlinkErr) => {
+              if (unlinkErr) {
+                console.error("Failed to delete old file:", unlinkErr);
+              } else {
+                console.log("Old file deleted successfully:", fullOldFilePath);
+              }
+            });
+          }
+        });
+      }
+
+      return res.status(200).json({ message: "Document updated successfully." });
+    });
+  });
+});
+
+app.delete("/api/documents/:id",  (req, res) => {
+  const { id } = req.params;
+
+  let newFilePath = null;
+
+  // If a new file is uploaded, set the new file path
+  if (req.file) {
+    newFilePath = `/uploads/${req.file.filename}`;
+  }
+
+  // Query to get the current file path
+  const getFileQuery = `SELECT filePath FROM tbldocument WHERE id = ?`;
+
+  db.query(getFileQuery, [id], (err, rows) => {
+    if (err) {
+      console.error("Database query error:", err);
+      return res.status(500).json({ error: "Failed to fetch document details." });
+    }
+
+    const oldFilePath = rows[0]?.filePath; // Get the current file path from the database
+
+    // Update the database with new values
+    const deleteQuery = `
+      DELETE FROM tbldocument WHERE id = ${id}`;
+
+   
+    db.query(deleteQuery, (err, result) => {
+      if (err) {
+        console.error("Database update error:", err);
+        return res.status(500).json({ error: "Database delete failed." });
+      }
+
+      // Delete the old file if a new file was uploaded and the old file exists
+      if ( oldFilePath) {
+        const fullOldFilePath = path.join(__dirname, oldFilePath); // Construct the full path
+       
+
+        // Check if the file exists before attempting deletion
+        fs.access(fullOldFilePath, fs.constants.F_OK, (accessErr) => {
+          if (accessErr) {
+        
+          } else {
+            fs.unlink(fullOldFilePath, (unlinkErr) => {
+              if (unlinkErr) {
+                console.error("Failed to delete old file:", unlinkErr);
+              } else {
+                console.log("Old file deleted successfully:", fullOldFilePath);
+              }
+            });
+          }
+        });
+      }
+
+      return res.status(200).json({ message: "Document delete successfully." });
+    });
+  });
+});
+
 
 //////////////=========DOCUMENT============>
 
@@ -696,9 +822,7 @@ app.delete("/api/deleteSupDeli/:id", (req, res) => {
           }
 
           if (result.affectedRows === 0) {
-            console.log(
-              `No rows affected, supply delivery not found for ID: ${id}`
-            );
+          
             return res.status(404).send("Supply delivery not found");
           }
 
@@ -1987,7 +2111,7 @@ app.get("/api/sales", async (req, res) => {
           data.push(res);
         }
       });
-      console.log(data);
+      
       return res.json(data);
     });
   } catch (error) {
@@ -2011,7 +2135,7 @@ app.get("/api/cancelled", async (req, res) => {
           data.push(res);
         }
       });
-      console.log(data);
+   
       return res.json(data);
     });
   } catch (error) {

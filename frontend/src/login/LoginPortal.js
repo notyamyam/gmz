@@ -15,10 +15,13 @@ const LoginPortal = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
     const credentials = { username: username, password: password };
+
     axios
       .post(`${apiUrl}/login`, credentials)
       .then((res) => {
+
         if (res.data.user.access === 1) {
           navigate("/system-admin/dashboard");
         } else if (res.data.user.access === 2) {
@@ -27,6 +30,7 @@ const LoginPortal = () => {
           navigate("/sales-admin/dashboard");
         }
 
+        localStorage.setItem('id' , res.data.user.id);
         localStorage.setItem('username' , res.data.user.username);
         localStorage.setItem('access' , res.data.user.access);
 

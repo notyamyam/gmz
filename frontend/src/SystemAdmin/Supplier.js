@@ -51,6 +51,7 @@ function Supplier() {
     };
 
     const updateSupplier = async (updatedSupplier) => {
+        console.log("===>" ,updatedSupplier);
         try {
             await axios.put(`${apiUrl}/supplier/${updatedSupplier.supplyId}`, updatedSupplier);
             fetchData();

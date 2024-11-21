@@ -73,7 +73,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
 
   return (
     <div id="addModal" className="modal-overlay">
-    
+      <div className="modal-content">
         <h2>Add New Document</h2>
         <form onSubmit={handleSubmit}>
           <label>File Name</label>
@@ -136,7 +136,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
             Cancel
           </button>
         </form>
-      
+      </div>
     </div>
   );
 };

@@ -52,16 +52,6 @@ function Header() {
         Welcome back,<span className="username"> {username}!</span>
       </div>
       <div className="dropdown">
-        {/* Notification Button */}
-        <button
-          type="button"
-          className="icon-button"
-          id="notificationButton"
-          onClick={() => setNotificationOpen(!isNotificationOpen)}
-        >
-          <FontAwesomeIcon icon={faBell} />
-          <span className="icon-button-badge">1</span>
-        </button>
 
         {/* User Button */}
         <button
@@ -72,15 +62,6 @@ function Header() {
         >
           <FontAwesomeIcon icon={faUser} />
         </button>
-
-        {/* Notification Dropdown */}
-        {isNotificationOpen && (
-          <div className="dropdown-notif" ref={notificationDropdownRef}>
-            <a href="#">Notification 1</a>
-            <a href="#">Notification 2</a>
-            <a href="#">Notification 3</a>
-          </div>
-        )}
 
         {/* User Dropdown */}
         {isUserDropdownOpen && (

@@ -116,7 +116,6 @@ app.post("/api/addaccount", async (req, res) => {
 });
 
 app.post("/api/editaccount/:id", async (req, res) => {
-
   const id = req.params.id;
   const username = req.body.username;
   const password = req.body.password;
@@ -133,7 +132,6 @@ app.post("/api/editaccount/:id", async (req, res) => {
 });
 
 app.delete("/api/deleteaccount/:id", async (req, res) => {
-
   const id = req.params.id;
 
   const sql = `DELETE FROM tblusers WHERE id = ${id}`;
@@ -263,7 +261,6 @@ app.get("/api/documents/view/:filename", (req, res) => {
   });
 });
 
-
 app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
   const { id } = req.params;
   const { documentName, category, expirationDate, description } = req.body;
@@ -280,7 +277,9 @@ app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
   db.query(getFileQuery, [id], (err, rows) => {
     if (err) {
       console.error("Database query error:", err);
-      return res.status(500).json({ error: "Failed to fetch document details." });
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch document details." });
     }
 
     const oldFilePath = rows[0]?.filePath; // Get the current file path from the database
@@ -305,12 +304,10 @@ app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
       // Delete the old file if a new file was uploaded and the old file exists
       if (newFilePath && oldFilePath) {
         const fullOldFilePath = path.join(__dirname, oldFilePath); // Construct the full path
-       
 
         // Check if the file exists before attempting deletion
         fs.access(fullOldFilePath, fs.constants.F_OK, (accessErr) => {
           if (accessErr) {
-        
           } else {
             fs.unlink(fullOldFilePath, (unlinkErr) => {
               if (unlinkErr) {
@@ -323,12 +320,14 @@ app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
         });
       }
 
-      return res.status(200).json({ message: "Document updated successfully." });
+      return res
+        .status(200)
+        .json({ message: "Document updated successfully." });
     });
   });
 });
 
-app.delete("/api/documents/:id",  (req, res) => {
+app.delete("/api/documents/:id", (req, res) => {
   const { id } = req.params;
 
   let newFilePath = null;
@@ -344,7 +343,9 @@ app.delete("/api/documents/:id",  (req, res) => {
   db.query(getFileQuery, [id], (err, rows) => {
     if (err) {
       console.error("Database query error:", err);
-      return res.status(500).json({ error: "Failed to fetch document details." });
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch document details." });
     }
 
     const oldFilePath = rows[0]?.filePath; // Get the current file path from the database
@@ -353,7 +354,6 @@ app.delete("/api/documents/:id",  (req, res) => {
     const deleteQuery = `
       DELETE FROM tbldocument WHERE id = ${id}`;
 
-   
     db.query(deleteQuery, (err, result) => {
       if (err) {
         console.error("Database update error:", err);
@@ -361,14 +361,12 @@ app.delete("/api/documents/:id",  (req, res) => {
       }
 
       // Delete the old file if a new file was uploaded and the old file exists
-      if ( oldFilePath) {
+      if (oldFilePath) {
         const fullOldFilePath = path.join(__dirname, oldFilePath); // Construct the full path
-       
 
         // Check if the file exists before attempting deletion
         fs.access(fullOldFilePath, fs.constants.F_OK, (accessErr) => {
           if (accessErr) {
-        
           } else {
             fs.unlink(fullOldFilePath, (unlinkErr) => {
               if (unlinkErr) {
@@ -385,7 +383,36 @@ app.delete("/api/documents/:id",  (req, res) => {
     });
   });
 });
+app.get("/api/documents/notifications", (req, res) => {
+  const currentDate = moment().format("YYYY-MM-DD");
+  const oneYearFromNow = moment().add(1, "year").format("YYYY-MM-DD");
+  const threeMonthsFromNow = moment().add(3, "months").format("YYYY-MM-DD");
 
+  // Modify the query as required
+  const query = `
+    SELECT d.* 
+    FROM tbldocument d
+    JOIN tblcategories c ON d.category = c.categoryName
+    WHERE 
+      -- Notify legal documents within 1 year of expiration
+      (c.type = 'Legal' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
+      OR
+      -- Notify contracts/agreements 3 months before renewal
+      (c.type = 'Contracts/Agreement' AND d.expirationDate BETWEEN '${currentDate}' AND '${threeMonthsFromNow}')
+      OR
+      -- Notify regular documents expiring in 1 year
+      (c.type = 'Document' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching notifications:", err);
+      return res.status(500).json({ error: "Failed to fetch notifications." });
+    }
+
+    return res.status(200).json(results);
+  });
+});
 
 //////////////=========DOCUMENT============>
 
@@ -575,7 +602,6 @@ app.get("/api/inventory-by-items/:itemId", (req, res) => {
 app.get("/api/rawmatsinv/:matId", (req, res) => {
   const matId = req.params.matId;
 
-  // Query to fetch raw materials details with date from tblsupdeli
   const query = `
         SELECT 
             tblrawmatsinv.inventoryId,
@@ -822,7 +848,6 @@ app.delete("/api/deleteSupDeli/:id", (req, res) => {
           }
 
           if (result.affectedRows === 0) {
-          
             return res.status(404).send("Supply delivery not found");
           }
 
@@ -887,31 +912,32 @@ app.get("/api/supplier/:id", async (req, res) => {
   }
 });
 
-// Add a supplier
 app.post("/api/addsupplier", async (req, res) => {
-  const { supplyName, address, contact, product } = req.body;
+  const { supplyName, address, contact, products } = req.body; // Expect products to be an array of { productId, price }
 
   try {
     // Insert supplier first
-    const supplierQuery = `INSERT INTO tblsuppliers (supplyName,  contact) VALUES (?, ?)`;
-    const supplierValues = [supplyName, contact];
+    const supplierQuery = `INSERT INTO tblsuppliers (supplyName, address, contact) VALUES (?, ?, ?)`;
+    const supplierValues = [supplyName, address, contact];
+
     db.query(supplierQuery, supplierValues, (error, results) => {
       if (error) {
         console.error("Error adding supplier: ", error);
         return res.status(500).send("Server Error");
       }
 
-      const newSupplierId = results.insertId; // Get the inserted supplier's ID
+      const newSupplierId = results.insertId; // Get the newly inserted supplier ID
 
-      // Now insert the raw materials into tblsupplierrawmats
-      if (product && product.length > 0) {
+      // Check if products array exists and has data
+      if (products && products.length > 0) {
         const supplierRawMatsQuery = `
-                    INSERT INTO tblsupplierrawmats (supplierId, rawMatId) 
-                    VALUES ${product.map(() => "(?, ?)").join(", ")}
-                `;
-        const supplierRawMatsValues = product.flatMap((p) => [
+          INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price)
+          VALUES ${products.map(() => "(?, ?, ?)").join(", ")}
+        `;
+        const supplierRawMatsValues = products.flatMap((p) => [
           newSupplierId,
-          p,
+          p.productId,
+          p.price,
         ]);
 
         db.query(supplierRawMatsQuery, supplierRawMatsValues, (err) => {
@@ -936,7 +962,7 @@ app.get("/api/supplier/:supplierId/rawmats", (req, res) => {
   const supplierId = req.params.supplierId;
 
   const query = `
-        SELECT rm.matId, rm.matName 
+        SELECT rm.matId as rawMatId, rm.matName ,sr.price
         FROM tblsupplierrawmats sr
         JOIN tblrawmats rm ON sr.rawMatId = rm.matId
         WHERE sr.supplierId = ?
@@ -947,27 +973,27 @@ app.get("/api/supplier/:supplierId/rawmats", (req, res) => {
       console.error("Error fetching supplier raw materials:", err);
       return res.status(500).json({ error: "Database error" });
     }
+
     res.json(results);
   });
 });
 
 // Update a supplier
 app.put("/api/supplier/:id", async (req, res) => {
-  const { supplyName, contact, product } = req.body; // Expect product as an array
+  const { supplyName, contact, product } = req.body;
 
   if (!supplyName || !contact) {
-    return res.status(400).send("All fields are required"); // Basic validation
+    return res.status(400).send("All fields are required");
   }
 
   const supplierId = req.params.id;
-
+  console.log(supplierId);
   try {
-    // Update supplier details
     const supplierQuery = `
-            UPDATE tblsuppliers 
-            SET supplyName = ?, contact = ? 
-            WHERE supplyId = ?
-        `;
+      UPDATE tblsuppliers 
+      SET supplyName = ?, contact = ? 
+      WHERE supplyId = ?
+    `;
     const supplierValues = [supplyName, contact, supplierId];
 
     db.query(supplierQuery, supplierValues, (error, results) => {
@@ -977,25 +1003,26 @@ app.put("/api/supplier/:id", async (req, res) => {
       }
 
       if (results.affectedRows === 0) {
-        return res.status(404).send("Supplier not found"); // Handle case where no rows are affected
+        return res.status(404).send("Supplier not found");
       }
 
-      // Now handle the raw materials related to the supplier
-      // First, remove existing raw materials for this supplier
       const deleteQuery = `DELETE FROM tblsupplierrawmats WHERE supplierId = ?`;
       db.query(deleteQuery, [supplierId], (err) => {
         if (err) {
-          console.error("Error deleting existing raw materials: ", err);
+          console.error("Error deleting raw materials: ", err);
           return res.status(500).send("Server Error");
         }
 
-        // Insert new raw materials
         if (product && product.length > 0) {
           const supplierRawMatsQuery = `
-                        INSERT INTO tblsupplierrawmats (supplierId, rawMatId) 
-                        VALUES ${product.map(() => "(?, ?)").join(", ")}
-                    `;
-          const supplierRawMatsValues = product.flatMap((p) => [supplierId, p]);
+            INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price) 
+            VALUES ${product.map(() => "(?, ?, ?)").join(", ")}
+          `;
+          const supplierRawMatsValues = product.flatMap((p) => [
+            supplierId,
+            p.rawMatId,
+            p.price,
+          ]);
 
           db.query(supplierRawMatsQuery, supplierRawMatsValues, (err) => {
             if (err) {
@@ -1011,6 +1038,103 @@ app.put("/api/supplier/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error in updating supplier: ", error);
+    res.status(500).send("Server Error");
+  }
+});
+
+//supply delivery
+// Fetch all Supply delivery
+app.get("/api/supDeli", async (req, res) => {
+  try {
+    // Adjust the query to match your table structure and required fields
+    const query = `
+      SELECT 
+        sp.supplyId,
+        sp.supplyName,
+        od.status,
+        od.totalCost AS totalCost,
+        MAX(od.orderDate) AS orderDate,
+        SUM(odi.quantity) AS totalQuantity
+      FROM tblsuppliers sp
+      LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
+      LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
+      WHERE odi.quantity IS NOT NULL
+      GROUP BY sp.supplyName;
+    `;
+
+    db.query(query, (error, results) => {
+      if (error) {
+        console.error("Error fetching supply deliveries: ", error);
+        return res.status(500).send("Server Error");
+      }
+
+      // Ensure results have data
+      if (results.length > 0) {
+        // Get the supplyIds from the results
+        const supplyIds = results.map((result) => result.supplyId);
+
+        // Create a promise for each supplyId to fetch detailed data
+        const detailedQueries = supplyIds.map((supplyId) => {
+          const productQuery = `
+            SELECT 
+              sp.supplyName,
+              od.totalCost,
+              od.orderDate,
+              odi.price,
+              odi.totalCost AS itemTotal,
+              odi.quantity,
+              mat.matName
+            FROM tblsuppliers sp
+            LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
+            LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
+            LEFT JOIN tblrawmats mat ON mat.matId = odi.matId
+            WHERE sp.supplyId = ${supplyId}
+              AND od.orderId IS NOT NULL
+              AND odi.orderId IS NOT NULL
+              AND mat.matId IS NOT NULL;
+          `;
+          return new Promise((resolve, reject) => {
+            db.query(productQuery, (error, productResults) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve({
+                  supplyId: supplyId,
+                  productDetails: productResults,
+                });
+              }
+            });
+          });
+        });
+
+        // Resolve all the promises to get all product details
+        Promise.all(detailedQueries)
+          .then((allProductDetails) => {
+            // Combine results with their respective product details
+            const response = results.map((supplier) => {
+              const productDetails = allProductDetails.find(
+                (detail) => detail.supplyId === supplier.supplyId
+              );
+              return {
+                ...supplier,
+                productDetails: productDetails
+                  ? productDetails.productDetails
+                  : [],
+              };
+            });
+
+            res.json(response);
+          })
+          .catch((error) => {
+            console.error("Error fetching product details: ", error);
+            res.status(500).send("Error fetching product details");
+          });
+      } else {
+        res.status(404).send("No suppliers found");
+      }
+    });
+  } catch (error) {
+    console.error("Error in fetching supply deliveries: ", error);
     res.status(500).send("Server Error");
   }
 });
@@ -1063,65 +1187,100 @@ app.put("/api/supplier/:supplyId", (req, res) => {
   );
 });
 
-// Delete a supplier and its associated raw materials
 app.delete("/api/deletesupplier/:id", (req, res) => {
   const supplierId = req.params.id;
 
-  // First, delete the raw materials associated with the supplier
-  const deleteRawMaterialsQuery =
-    "DELETE FROM tblsupplierrawmats WHERE supplierId = ?";
-  db.query(deleteRawMaterialsQuery, [supplierId], (err) => {
+  // First, delete records from tblrawmatsinv that reference supDeliId in tblsupdeli
+  const deleteRawMatsInvQuery = `
+    DELETE FROM tblrawmatsinv WHERE supDeliId IN (SELECT supDeliId FROM tblsupdeli WHERE supplyId = ?)
+  `;
+  db.query(deleteRawMatsInvQuery, [supplierId], (err) => {
     if (err) {
-      console.error("Error deleting raw materials:", err);
-      return res.status(500).send("Error deleting raw materials");
+      console.error("Error deleting raw materials inventory records:", err);
+      return res
+        .status(500)
+        .send("Error deleting raw materials inventory records");
     }
 
-    // Now delete the supplier
-    const sql = "DELETE FROM tblsuppliers WHERE supplyId = ?";
-    db.query(sql, [supplierId], (err, result) => {
+    // Next, delete records in tblsupdeli that reference the supplierId
+    const deleteSupDeliQuery = `
+      DELETE FROM tblsupdeli WHERE supplyId = ?
+    `;
+    db.query(deleteSupDeliQuery, [supplierId], (err) => {
       if (err) {
-        console.error("Error deleting supplier:", err);
-        return res.status(500).send("Error deleting supplier");
+        console.error("Error deleting supplier delivery records:", err);
+        return res.status(500).send("Error deleting supplier delivery records");
       }
 
-      // Check if any rows were affected (supplier exists)
-      if (result.affectedRows === 0) {
-        return res.status(404).send("Supplier not found");
-      }
+      // Then, delete raw materials associated with the supplier
+      const deleteRawMaterialsQuery = `
+        DELETE FROM tblsupplierrawmats WHERE supplierId = ?
+      `;
+      db.query(deleteRawMaterialsQuery, [supplierId], (err) => {
+        if (err) {
+          console.error("Error deleting raw materials:", err);
+          return res.status(500).send("Error deleting raw materials");
+        }
 
-      res.json({ message: "Supplier and associated raw materials deleted" });
+        // Finally, delete the supplier itself
+        const deleteSupplierQuery = `
+          DELETE FROM tblsuppliers WHERE supplyId = ?
+        `;
+        db.query(deleteSupplierQuery, [supplierId], (err, result) => {
+          if (err) {
+            console.error("Error deleting supplier:", err);
+            return res.status(500).send("Error deleting supplier");
+          }
+
+          // Check if any rows were affected (supplier exists)
+          if (result.affectedRows === 0) {
+            return res.status(404).send("Supplier not found");
+          }
+
+          res.json({
+            message: "Supplier and associated records deleted successfully",
+          });
+        });
+      });
     });
   });
 });
 
-//supply delivery
-// Fetch all Supply delivery
-app.get("/api/supDeli", async (req, res) => {
+app.get("/api/supDeli/:supplierId", async (req, res) => {
+  const { supplierId } = req.params;
+
   try {
     const query = `
-            SELECT sd.supDeliId, sd.supplyId, rm.matName, sd.quantity, sd.cost, sd.date 
-            FROM tblSupDeli sd 
-            JOIN tblrawmats rm ON sd.matId = rm.matId
-            ORDER BY 
-                sd.date DESC`; // Adjust table names and fields as needed
-    db.query(query, (error, results) => {
+      SELECT 
+        sr.rawMatId,
+        rm.matName,
+        sr.price
+      FROM 
+        tblsupplierrawmats sr
+      JOIN 
+        tblrawmats rm ON sr.rawMatId = rm.matId
+      WHERE 
+        sr.supplierId = ?
+      ORDER BY 
+        rm.matName ASC`; // Order alphabetically by material name for better readability
+
+    db.query(query, [supplierId], (error, results) => {
       if (error) {
-        console.error("Error fetching supply deliveries: ", error);
-        res.status(500).send("Server Error");
-      } else {
-        res.json(results);
+        console.error("Error fetching supplier products: ", error);
+        return res.status(500).send("Server Error");
       }
+      res.json(results);
     });
   } catch (error) {
-    console.error("Error in fetching supply deliveries: ", error);
+    console.error("Error in fetching supplier products: ", error);
     res.status(500).send("Server Error");
   }
 });
 
 //getting the details for Supplier Details Modal for system admin
 app.get("/api/supDeli/:id", async (req, res) => {
-  const supplyId = req.params.id; // Get the supplyId from the request parameters
-
+  const supplyId = req.params.id;
+  console.log("==", supplyId);
   try {
     const query = `
             SELECT 
@@ -1129,8 +1288,70 @@ app.get("/api/supDeli/:id", async (req, res) => {
                 sd.supplyId, 
                 rm.matName, 
                 sd.quantity, 
-                sd.cost, 
-                sd.date 
+                sd.cost, app.post("/api/addLogs", (req, res) => {
+  const { logName, logDescription, logDate } = req.body;
+  const sql = "INSERT INTO tbllogs (logName, logDescription, logDate) VALUES (?, ?, ?)";
+  db.query(sql, [logName, logDescription, logDate], (err, result) => {
+    if (err) {
+      console.error("Error adding log:", err);
+      return res.status(500).send("Error adding log");
+    }
+    res.status(201).send("Log added successfully");
+  });
+});
+
+app.get("/api/logs", (req, res) => {
+  const sql = "SELECT * FROM tbllogs";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching logs:", err);
+      return res.status(500).send("Error fetching logs");
+    }
+    res.json(results);
+  });
+});
+
+app.get("/api/logs/:id", (req, res) => {
+  const id = req.params.id;
+  const sql = "SELECT * FROM tbllogs WHERE logId = ?";
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      console.error("Error fetching log:", err);
+      return res.status(500).send("Error fetching log");
+    }
+    if (result.length === 0) {
+      return res.status(404).send("Log not found");
+    }
+    res.json(result[0]);
+  });
+});
+
+app.put("/api/logs/:id", (req, res) => {
+  const id = req.params.id;
+  const { logName, logDescription, logDate } = req.body;
+  const sql = "UPDATE tbllogs SET logName = ?, logDescription = ?, logDate = ? WHERE logId = ?";
+  db.query(sql, [logName, logDescription, logDate, id], (err, result) => {
+    if (err) {
+      console.error("Error updating log:", err);
+      return res.status(500).send("Error updating log");
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).send("Log not found");
+    }
+    res.send("Log updated successfully");
+  });
+});
+
+app.delete("/api/logs/:id", (req, res) => {
+  const id = req.params.id;
+  const sql = "DELETE FROM tbllogs WHERE logId = ?";
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      console.error("Error deleting log:", err);
+      return res.status(500).send("Error deleting log");
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404ate 
             FROM 
                 tblSupDeli sd 
             JOIN 
@@ -1145,9 +1366,9 @@ app.get("/api/supDeli/:id", async (req, res) => {
       if (error) {
         console.error("Error fetching supply deliveries: ", error);
         res.status(500).send("Server Error");
-      } else {
-        res.json(results);
       }
+      console.log(results);
+      return res.json(results);
     });
   } catch (error) {
     console.error("Error in fetching supply deliveries: ", error);
@@ -1231,7 +1452,7 @@ app.get("/api/getrawmaterials/:supplierId", (req, res) => {
 
   // Query to fetch raw material names based on the supplierId
   const query = `
-        SELECT r.matName , r.matId
+        SELECT r.matName , r.matId , s.price
         FROM tblsupplierrawmats s
         JOIN tblrawmats r ON s.rawMatId = r.matId
         WHERE s.supplierId = ?`;
@@ -1250,7 +1471,6 @@ app.get("/api/getrawmaterials/:supplierId", (req, res) => {
 app.post("/api/addsupplydelivery", (req, res) => {
   const { supplyId, matId, quantity, cost, date } = req.body;
 
-  // Check if any required fields are missing
   if (!supplyId || !matId || !quantity || !cost || !date) {
     console.error("Missing fields in the request body");
     return res.status(400).send("Bad Request: Missing required fields");
@@ -1313,6 +1533,115 @@ app.post("/api/addsupplydelivery", (req, res) => {
         }
       });
     }
+  });
+});
+
+// app.post("/api/placeOrderDelivery", (req, res) => {
+//   const { supplyId, products, totalCost } = req.body;
+
+//   // Check if products are provided
+//   if (!products || products.length === 0) {
+//     return res.status(400).json({ message: "No products in the order" });
+//   }
+
+//   const orderDate = new Date().toISOString().split("T")[0]; // Current date in 'YYYY-MM-DD' format
+
+//   // Loop through each product in the order and insert it into tblsupdeli
+//   const query =
+//     "INSERT INTO tblsupdeli (supplyId, matId, quantity, cost, date) VALUES ?";
+//   const values = products.map((product) => [
+//     supplyId,
+//     product.productId, // Material ID (matId)
+//     product.quantity, // Quantity of the product
+//     product.total, // Total cost for the product (quantity * price)
+//     orderDate,
+//   ]);
+
+//   db.query(query, [values], (err, result) => {
+//     if (err) {
+//       console.error("Error inserting order:", err);
+//       return res.status(500).json({ message: "Failed to place order" });
+//     }
+
+//     return res.status(200).json({
+//       message: "Order placed successfully",
+//       orderId: result.insertId,
+//       totalCost: totalCost,
+//     });
+//   });
+// });
+
+app.post("/api/placeOrderDelivery", (req, res) => {
+  const { supplyId, products, totalCost } = req.body;
+
+  if (!products || products.length === 0) {
+    return res.status(400).json({ message: "No products in the order" });
+  }
+
+  const orderDate = new Date().toISOString().split("T")[0]; // Current date in 'YYYY-MM-DD' format
+
+  // Start transaction to insert order and order items
+  db.beginTransaction((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Failed to start transaction" });
+    }
+
+    // Insert order into tblorders
+    const insertOrderQuery =
+      "INSERT INTO tblordersfromsupplier (supplyId, totalCost, orderDate , status) VALUES (?, ?, ? , ?)";
+    db.query(
+      insertOrderQuery,
+      [supplyId, totalCost, orderDate, 0],
+      (err, result) => {
+        if (err) {
+          return db.rollback(() => {
+            res
+              .status(500)
+              .json({ message: "Failed to place order", Error: err });
+          });
+        }
+
+        const orderId = result.insertId;
+
+        // Insert order items into tblorderfromsupplier_items
+        const insertItemsQuery =
+          "INSERT INTO tblorderfromsupplier_items (orderId, matId, quantity, price, totalCost) VALUES ?";
+        const values = products.map((product) => [
+          orderId, // Order ID from tblorders
+          product.productId, // Material ID (matId)
+          product.quantity, // Quantity ordered
+          product.price, // Price per unit
+          product.total, // Total cost for this item
+        ]);
+
+        db.query(insertItemsQuery, [values], (err, result) => {
+          if (err) {
+            return db.rollback(() => {
+              res
+                .status(500)
+                .json({ message: "Failed to add items to the order" });
+            });
+          }
+
+          db.commit((err) => {
+            if (err) {
+              return db.rollback(() => {
+                res
+                  .status(500)
+                  .json({ message: "Failed to commit transaction" });
+              });
+            }
+
+            // Successfully committed the transaction
+            res.status(200).json({
+              message: "Order placed successfully",
+              orderId,
+              totalCost,
+            });
+          });
+        });
+      }
+    );
   });
 });
 
@@ -1483,7 +1812,8 @@ app.get("/api/categories/inventory", (req, res) => {
 });
 
 app.get("/api/categories/document", (req, res) => {
-  const query = "SELECT * FROM tblCategories WHERE type = 'Document'";
+  const query =
+    "SELECT * FROM tblCategories WHERE type IN ('Document', 'Contracts/Agreement', 'Legal')";
   db.query(query, (err, results) => {
     if (err) {
       console.error("Error fetching inventory categories:", err);
@@ -2111,7 +2441,7 @@ app.get("/api/sales", async (req, res) => {
           data.push(res);
         }
       });
-      
+
       return res.json(data);
     });
   } catch (error) {
@@ -2135,7 +2465,7 @@ app.get("/api/cancelled", async (req, res) => {
           data.push(res);
         }
       });
-   
+
       return res.json(data);
     });
   } catch (error) {
@@ -2694,6 +3024,111 @@ app.get("/api/sales/summary", (req, res) => {
     res.json(results);
   });
 });
+
+/*
+CUSTOMER
+*/
+app.get("/api/api-get-customer-info/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    console.log(userId);
+    const sql = `
+   SELECT c.name, c.location
+   FROM tblusers u 
+   LEFT JOIN tblcustomer c ON c.customer_id = u.id 
+   WHERE u.id = '${userId}'
+`;
+    await db.query(sql, (err, result) => {
+      console.log(result[0]);
+      return res.status(200).json({ status: "success", res: result[0] });
+    });
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.get("/api/api-items", async (req, res) => {
+  try {
+    const sql = `SELECT * FROM tblitems`;
+    await db.query(sql, (err, result) => {
+      console.log(result);
+      return res.status(200).json({ status: "success", res: result });
+    });
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/api/api-insert-to-cart", async (req, res) => {
+  console.log(req.body);
+
+  const isOrdered = "0";
+  const {
+    selectedProduct,
+    itemName,
+    price,
+    description,
+    quantity,
+    totalPrice,
+    customerId,
+    customerName,
+    customerLoc,
+  } = req.body;
+
+  // if (
+  //   !itemId ||
+  //   !itemName ||
+  //   !price ||
+  //   !description ||
+  //   !quantity ||
+  //   !totalPrice
+  // ) {
+  //   return res.status(400).json({ message: "All fields are required." });
+  // }
+  try {
+    const sql = `INSERT INTO tblorder_cus 
+    (item_id, item_name, price, description, qty, total_price, isOrdered, customer_id, customer_name, customer_loc) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    await db.query(
+      sql,
+      [
+        selectedProduct,
+        itemName,
+        price,
+        description,
+        quantity,
+        totalPrice,
+        isOrdered,
+        customerId,
+        customerName,
+        customerLoc,
+      ],
+      (err, result) => {
+        if (err) {
+          return res.status(500).json({ message: err });
+        }
+
+        console.log(result);
+
+        return res.status(200).json({
+          message: "Added to cart successfully.",
+          status: "success",
+          res: result,
+        });
+      }
+    );
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/*
+CUSTOMER
+*/
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

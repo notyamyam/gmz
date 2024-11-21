@@ -3126,6 +3126,29 @@ app.post("/api/api-insert-to-cart", async (req, res) => {
   }
 });
 
+app.get("/api/mycart/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    console.log(userId);
+
+    const sql = `SELECT item_name, description, price, 
+    SUM(qty) AS qty,
+    SUM(total_price) AS total_price
+    FROM tblorder_cus 
+    WHERE isOrdered = "0" 
+    AND customer_id = ${userId} 
+    GROUP BY item_name, price;`;
+
+    await db.query(sql, (err, result) => {
+      console.log(result);
+      return res.status(200).json({ status: "success", res: result });
+    });
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 /*
 CUSTOMER
 */

@@ -877,11 +877,6 @@ th i {
   color: white;
 }
 
-.edit-btn,
-.btn {
-  background-color: blue;
-  color: white;
-}
 
 .headercon {
   display: flex;

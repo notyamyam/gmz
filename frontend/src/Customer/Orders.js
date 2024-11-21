@@ -5,6 +5,9 @@ import Sidebar from "../BG/Customer/CustomerSidebar";
 import axios from "axios";
 import apiUrl from "../ApiUrl/apiUrl";
 import { faVolumeHigh } from "@fortawesome/free-solid-svg-icons";
+import style from "./Orders.module.css";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Orders() {
   const [showAddToCart, setAddToCart] = useState(false);
@@ -35,16 +38,13 @@ function Orders() {
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerLoc, setCustomerLoc] = useState("");
-  const [loading, setLoading] = useState(true); // Optional: to show loading state
-  const [error, setError] = useState(null); // Optional: to handle errors
+
+  const userId = localStorage.getItem("id"); // get ID of customer.;
 
   useEffect(() => {
     const fetchCustomerName = async () => {
-      const userId = localStorage.getItem("id"); // Retrieve user ID from localStorage
-
       if (!userId) {
-        setError("User ID not found in localStorage.");
-        setLoading(false);
+        console.log("User ID not found in localStorage.");
         return;
       }
 
@@ -60,9 +60,7 @@ function Orders() {
           throw new Error("Failed to fetch customer name");
         }
       } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        console.log(err.message);
       }
     };
 
@@ -79,13 +77,29 @@ function Orders() {
           throw new Error("No items found");
         }
       } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        console.log(err.message);
       }
     };
 
     fetchItems();
+  }, []);
+
+  const [cartItems, setCartItems] = useState([]);
+  useEffect(() => {
+    const fetchMyCart = async () => {
+      try {
+        const res = await axios.get(`${apiUrl}/mycart/${userId}`);
+        if (res.data.status === "success") {
+          console.log(res.data.res);
+          setCartItems(res.data.res);
+        } else {
+          throw new Error("No products found.");
+        }
+      } catch (err) {
+        console.log(err.message);
+      }
+    };
+    fetchMyCart();
   }, []);
 
   const resetFields = () => {
@@ -174,8 +188,7 @@ function Orders() {
       );
       if (response.status === 200) {
         console.log(response);
-        alert(response.data.message);
-        // alert("Order placed successfully!");
+        toast.success(response.data.message);
       } else {
         alert("Failed to place order.");
       }
@@ -189,25 +202,20 @@ function Orders() {
     resetFields();
   };
 
-  if (loading) {
-    return <p>Loading...</p>; // Loading state
-  }
-
-  if (error) {
-    return <p>Error: {error}</p>; // Error state
-  }
-
   return (
     <div className="container1">
       <Sidebar />
       <Header />
       <div className="main-content">
         <div className="d-flex w-100 justify-content-between">
-          <button className="" onClick={openAddToCartModal}>
-            <i className="fa-solid fa-add"></i> Add
+          <button
+            className={`${style.btnDefault}`}
+            onClick={openAddToCartModal}
+          >
+            <i className="fa-solid fa-add"></i> Buy Products
           </button>
           <button className="btn btn-success" onClick={openViewMyCart}>
-            <i className="fa-solid fa-add"></i> My Cart
+            <i class="fa fa-shopping-cart"></i>
           </button>
         </div>
 
@@ -226,7 +234,6 @@ function Orders() {
           </table>
         </div>
       </div>
-
       {/* Modal for add to cart product*/}
       {showAddToCart && (
         <div className="modal-overlay">
@@ -338,7 +345,6 @@ function Orders() {
           </div>
         </div>
       )}
-
       {/* MODAL FOR VIEW CART */}
       {showMyCart && (
         <div className="modal-overlay">
@@ -351,9 +357,47 @@ function Orders() {
                 onClick={closeViewMyCart}
               ></button>
             </div>
+            <div className="d-flex w-100">
+              <div className="table-list w-100">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Item name</th>
+                      <th>Description</th>
+                      <th>Price</th>
+                      <th>Quantity</th>
+                      <th>Total Price</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems.length === 0 ? (
+                      <tr>
+                        <td colSpan="5">No items in cart</td>
+                      </tr>
+                    ) : (
+                      cartItems.map((item, index) => (
+                        <tr key={index}>
+                          <td>{item.item_name}</td>
+                          <td>{item.description}</td>
+                          <td>{item.price}</td>
+                          <td>{item.qty}</td>
+                          <td>{item.total_price}</td>
+
+                          <td>
+                            <button className="btn btn-primary">Order</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
+      <ToastContainer />;
     </div>
   );
 }

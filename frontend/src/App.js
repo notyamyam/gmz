@@ -31,7 +31,7 @@ import Cancelled from "./SalesAdmin/Cancelled.js";
 
 import CustomerDashboard from "./Customer/Dashboard.js";
 import CustomerOrders from "./Customer/Orders.js";
-import CustomerHistory from "./Customer/History.js";
+import CustomerCancelled from "./Customer/Cancelled.js";
 
 const App = () => {
   const [userAccess, setUserAccess] = useState(null);
@@ -305,10 +305,10 @@ const App = () => {
           />
 
           <Route
-            path="/customer/history"
+            path="/customer/cancelled"
             element={
               <ProtectedRoute
-                element={<CustomerHistory />}
+                element={<CustomerCancelled />}
                 requiredAccess="4"
               />
             }

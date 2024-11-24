@@ -6,10 +6,12 @@ import Sidebar from "../BG/DataAdminSidebar";
 import AddSupplyDeliveryModal from "./AddSupplyDeliveryModal";
 import UpdateSupplyDeliveryModal from "./UpdateSupplyDeliveryModal";
 import DeleteModal from "./DeleteModal";
+
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import apiUrl from "../ApiUrl/apiUrl";
+import ConfirmReceiveModal from "./ConfirmReceiveModal";
 
 function SupplyDeliveries() {
   const [supDeli, setSupDeli] = useState([]); // Track multiple delivery records
@@ -24,34 +26,88 @@ function SupplyDeliveries() {
   const [sortOrder, setSortOrder] = useState("asc");
   const [isView, setIsView] = useState(false);
   const [orderedItems, setOrderedItems] = useState([]);
+  const [selectedPuchase, setSelectedPurchase] = useState([]);
+  const [viewPrice, setViewPrice] = useState(0);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
   const fetchData = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/supDeli`);
-      console.log(">>>>", response);
-      setSupDeli(response.data);
+      await axios
+        .get(`${apiUrl}/supplier`)
+        .then((res) => {
+          setSuppliers(res.data);
+        })
+        .catch((err) => console.log(err));
 
-      const supplierResponse = await axios.get(`${apiUrl}/supplier`);
-      setSuppliers(supplierResponse.data);
+      await axios
+        .get(`${apiUrl}/supDeli`)
+        .then((res) => {
+     
+          setSupDeli(res.data);
+        })
+        .catch((err) => console.log(err));
 
-      const itemResponse = await axios.get(`${apiUrl}/item`);
-      setItems(itemResponse.data);
+      await axios
+        .get(`${apiUrl}/item`)
+        .then((res) => {
+          setItems(res.data);
+        })
+        .catch((err) => console.log(err));
     } catch (error) {
       console.error("Error fetching data:", error);
     }
   };
 
-  const handlePlaceOrder = (orderDetails) => {
+  const handlePlaceOrder = async (orderDetails) => {
     // Send the order details to the server to place the order
-    axios
+    await axios
       .post(`${apiUrl}/placeOrderDelivery`, orderDetails)
       .then((response) => {
-        console.log(response.data.message);
+        toast.success("Order placed.");
         fetchData();
         setAddModalOpen(false);
       })
       .catch((error) => {
         console.error("Error placing order:", error);
       });
+  };
+
+  const handleUpdateOrder = async (e, updatedOrder) => {
+    e.preventDefault();
+
+    try {
+      const response = await axios.post(
+        `${apiUrl}/updateOrderDelivery`,
+        updatedOrder
+      );
+      toast.success("Order updated.");
+      fetchData();
+    } catch (error) {
+      console.error("Failed to update order:", error);
+    }
+  };
+  const handleConfirmReceive = async (item, receivedQuantity) => {
+    try {
+      // Call the merged endpoint to update the item and potentially the order status
+      const response = await axios.put(`${apiUrl}/updateItemAndOrderStatus`, {
+        orderItemId: item.orderItemId,
+        receivedQuantity,
+        orderId: item.orderId,
+      });
+
+
+
+      const { allItemsReceived, message } = response.data;
+
+      // Show a success message
+      toast.success(message);
+
+      fetchData();
+      setIsConfirmModalOpen(false);
+    } catch (error) {
+      console.error("Error updating item or order status:", error);
+      toast.error("Failed to update item.");
+    }
   };
 
   const getSupply = (id) => {
@@ -91,8 +147,9 @@ function SupplyDeliveries() {
     setDeleteModalOpen(true);
   };
 
-  const openUpdateModal = (id) => {
-    setSelectedDeliveryId(id);
+  const openUpdateModal = (items) => {
+    setSelectedPurchase(items);
+    setSelectedDeliveryId(items.supDeliIds);
     setUpdateModalOpen(true);
   };
 
@@ -120,7 +177,7 @@ function SupplyDeliveries() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [supDeli]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -206,27 +263,31 @@ function SupplyDeliveries() {
 
                     <td>{formatDate(delivery.orderDate)}</td>
                     <td>
-                      <button
-                        className="done-btn"
-                        onClick={() => {
-                          setOrderedItems(delivery.productDetails);
-                          setIsView(true);
-                        }}
-                      >
-                        <i className="fa-solid fa-eye"></i>
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() => confirmDeleteItem(delivery)}
-                      >
-                        <i className="fa-solid fa-trash-can"></i>
-                      </button>
-                      <button
-                        className="edit-btn"
-                        onClick={() => openUpdateModal(delivery.supDeliId)}
-                      >
-                        <i className="fa-solid fa-pen-to-square"></i>
-                      </button>
+                      <div className="docubutton">
+                        <button
+                          className="done-btn"
+                          onClick={() => {
+                            setOrderedItems(delivery.productDetails);
+                            setViewPrice(delivery.totalCost);
+                            setIsView(true);
+                          }}
+                        >
+                          <i className="fa-solid fa-eye"></i>
+                        </button>
+                        {/* <button
+                          className="btn"
+                          onClick={() => confirmDeleteItem(delivery)}
+                        >
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button> */}
+                        <button
+                          className="edit-btn"
+                          hidden={delivery.status == 1}
+                          onClick={() => openUpdateModal(delivery)}
+                        >
+                          <i className="fa-solid fa-pen-to-square"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -254,17 +315,21 @@ function SupplyDeliveries() {
         isOpen={isUpdateModalOpen}
         onClose={() => setUpdateModalOpen(false)}
         suppliers={suppliers}
-        items={items}
-        setItems={setItems}
-        deliveryId={selectedDeliveryId}
-        onUpdate={fetchData}
+        selectedPurchase={selectedPuchase}
+        onUpdate={handleUpdateOrder}
       />
 
       {/* Modal Rendering */}
       {isView && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2>Items Ordered</h2>
+            <div className="isViewModalHeader">
+              {" "}
+              <h2>Items Ordered</h2>
+              <h2>
+                Total: {viewPrice?.toFixed(2) ? viewPrice?.toFixed(2) : 0}
+              </h2>
+            </div>
             <table>
               <thead>
                 <tr>
@@ -272,7 +337,9 @@ function SupplyDeliveries() {
                   <th>Material Name</th>
                   <th>Price</th>
                   <th> Quantity </th>
+                  <th> Status </th>
                   <th> Total Cost </th>
+                  <th> Action </th>
                 </tr>
               </thead>
               <tbody>
@@ -281,9 +348,42 @@ function SupplyDeliveries() {
                     <tr key={index + 1}>
                       <td>{index + 1}</td>
                       <td>{order.matName}</td>
-                      <td>₱ {order.price}</td>
+                      <td>₱{order.price}</td>
                       <td>{order.quantity}</td>
-                      <td>₱ {order.itemTotal}</td>
+                      <td>
+                        {" "}
+                        <span
+                          className={`badge ${
+                            order.itemStatus == 1
+                              ? "badge-completed"
+                              : order.itemStatus == 2
+                              ? "badge-cancelled"
+                              : "badge-pending"
+                          }`}
+                        >
+                          {order.itemStatus == 1
+                            ? "Completed"
+                            : order.itemStatus == 2
+                            ? "Cancelled"
+                            : "Pending"}
+                        </span>
+                      </td>
+                      <td>₱{order.itemTotal}</td>
+                      <td>
+                        {" "}
+                        <div className="docubutton">
+                          <button
+                            className="edit-btn"
+                            hidden={order.itemStatus == 1}
+                            onClick={() => {
+                              setSelectedItem(order);
+                              setIsConfirmModalOpen(true);
+                            }}
+                          >
+                            <i className="fa-solid fa-arrow-right"></i>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
@@ -299,6 +399,14 @@ function SupplyDeliveries() {
           </div>
         </div>
       )}
+
+      <ConfirmReceiveModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmReceive}
+        item={selectedItem}
+      />
+
       <ToastContainer />
     </div>
   );

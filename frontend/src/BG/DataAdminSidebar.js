@@ -8,7 +8,7 @@ import { faHouse, faTruck, faBox, faUserTie, faBoxesStacked, faIndustry } from '
 const Sidebar = () => {
   return (
     <div className="sidebar">
-      <h2><img src={gmzlogo} width="85" height="75" alt="Logo" /></h2>
+      {/* <h2><img src={gmzlogo} width="85" height="75" alt="Logo" /></h2> */}
       <ul>
         <li><Link to="/data-admin/dashboard"><FontAwesomeIcon icon={faHouse} /> Dashboard</Link></li>
         <li><Link to="/data-admin/product"><FontAwesomeIcon icon={faBox} /> Products</Link></li>

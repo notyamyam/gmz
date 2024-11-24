@@ -160,3 +160,26 @@ tr:nth-child(even) {
 .modalBtn:hover {
     opacity: 0.9;
 }
+
+.insufficient-materials {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #ffe5e5;
+    border: 1px solid #ff0000;
+    border-radius: 5px;
+  }
+  
+  .insufficient-materials h3 {
+    margin: 0 0 10px;
+    color: #ff0000;
+  }
+  
+  .insufficient-materials ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  .insufficient-materials li {
+    margin: 5px 0;
+  }
+  

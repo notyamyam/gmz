@@ -27,7 +27,7 @@ const Sidebar = () => {
         </li>
 
         <li>
-          <Link to="/customer/history">History</Link>
+          <Link to="/customer/cancelled">Cancelled Orders</Link>
         </li>
       </ul>
     </div>

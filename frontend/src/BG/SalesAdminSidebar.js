@@ -8,7 +8,7 @@ import { faHouse, faTruck, faBox, faChartLine, faClipboardList, faTimes, faCog }
 const Sidebar = () => {
   return (
     <div className="sidebar">
-      <h2><img src={gmzlogo} width="85" height="75" alt="Logo" /></h2>
+      {/* <h2><img src={gmzlogo} width="85" height="75" alt="Logo" /></h2> */}
       <ul>
         <li><Link to="/sales-admin/dashboard"><FontAwesomeIcon icon={faHouse} /> Dashboard</Link></li>
         <li><Link to="/sales-admin/order"><FontAwesomeIcon icon={faClipboardList} /> Orders</Link></li>

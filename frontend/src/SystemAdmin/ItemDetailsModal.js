@@ -4,11 +4,14 @@ import '../css/AddItemModal.css'; // You can style your modal here
 import apiUrl from '../ApiUrl/apiUrl';
 
 function ItemDetailsModal({ isOpen, onClose, item }) {
-    const [ItemDetails, setItemDetails] = useState([]);
+    const [itemDetails, setItemDetails] = useState([]);
+    const [ingredients, setIngredients] = useState([]);
+    const [showIngredients, setShowIngredients] = useState(false);
 
     useEffect(() => {
         if (isOpen && item) {
             fetchItemDetails(item.itemId);
+            fetchItemIngredients(item.itemId);
         }
     }, [isOpen, item]);
 
@@ -21,6 +24,15 @@ function ItemDetailsModal({ isOpen, onClose, item }) {
         }
     };
 
+    const fetchItemIngredients = async (itemId) => {
+        try {
+            const response = await axios.get(`${apiUrl}/item/${itemId}/materials`);
+            setIngredients(response.data);
+        } catch (error) {
+            console.error('Error fetching ingredients:', error);
+        }
+    };
+
     if (!isOpen || !item) {
         return null; // Don't render if the modal is not open
     }
@@ -28,8 +40,8 @@ function ItemDetailsModal({ isOpen, onClose, item }) {
     return (
         <div className="modal-overlay">
             <div className="modal-content">
-                <h2>ItemDetails for {item.itemName}</h2>
-                <table className='modal-table'>
+                <h2>Details for {item.itemName}</h2>
+                <table className="modal-table">
                     <thead>
                         <tr>
                             <td>#</td>
@@ -40,7 +52,7 @@ function ItemDetailsModal({ isOpen, onClose, item }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {ItemDetails.map((detail, index) => (
+                        {itemDetails.map((detail, index) => (
                             <tr key={detail.inventoryId}>
                                 <td>{index + 1}</td>
                                 <td>{'Batch#' + detail.inventoryId}</td>
@@ -51,7 +63,41 @@ function ItemDetailsModal({ isOpen, onClose, item }) {
                         ))}
                     </tbody>
                 </table>
-                <button type="button" onClick={onClose}>Cancel</button>
+
+                <button
+                    className="toggle-ingredients-button"
+                    onClick={() => setShowIngredients(!showIngredients)}
+                >
+                    {showIngredients ? 'Hide Ingredients' : 'Show Ingredients'}
+                </button>
+
+                {showIngredients && (
+                    <div className="ingredients-table-container">
+                        <h3>Ingredients</h3>
+                        <table className="modal-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Ingredient Name</th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {ingredients.map((ingredient, index) => (
+                                    <tr key={ingredient.matId}>
+                                        <td>{index + 1}</td>
+                                        <td>{ingredient.matName}</td>
+                                        <td>{ingredient.category}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                <button type="button" onClick={onClose}>
+                    Close
+                </button>
             </div>
         </div>
     );

@@ -8,8 +8,8 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
   const [availableProducts, setAvailableProducts] = useState([]);
   const [addedProducts, setAddedProducts] = useState([]);
   const [totalCost, setTotalCost] = useState(0);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [productPrice, setSelectedPrice] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState([]);
+  const [productPrice, setSelectedPrice] = useState(0);
   const [quantity, setQuantity] = useState("");
 
   useEffect(() => {
@@ -20,7 +20,7 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
           const response = await axios.get(
             `${apiUrl}/getrawmaterials/${selectedSupplier}`
           );
-          setAvailableProducts(response.data); // Store available products from the supplier
+          setAvailableProducts(response.data);
         } catch (error) {
           console.error("Error fetching products for supplier:", error);
         }
@@ -32,21 +32,28 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
 
   // Handle adding products to the order
   const handleAddProduct = (productId, quantity, price) => {
+    console.log("available", availableProducts);
+
     if (quantity && price) {
       const existingProductIndex = addedProducts.findIndex(
         (item) => item.productId === productId
       );
 
       if (existingProductIndex === -1) {
-        // Add new product to the list
         setAddedProducts((prev) => [
           ...prev,
-          { productId, quantity, price, total: quantity * price },
+          {
+            matName: selectedProduct.matName,
+            productId,
+            quantity,
+            price,
+            total: quantity * price,
+          },
         ]);
-        // Remove the added product from available products
-        setAvailableProducts((prev) =>
-          prev.filter((prod) => prod.matId !== productId)
-        );
+
+        // setAvailableProducts((prev) =>
+        //   prev.filter((prod) => prod.matId !== productId)
+        // );
       } else {
         // Update existing product quantity and total cost
         const updatedProducts = [...addedProducts];
@@ -54,8 +61,7 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
           ...updatedProducts[existingProductIndex],
           quantity: updatedProducts[existingProductIndex].quantity + quantity, // Increment quantity
           total:
-            (updatedProducts[existingProductIndex].quantity + quantity) *
-            price, // Recalculate total
+            (updatedProducts[existingProductIndex].quantity + quantity) * price, // Recalculate total
         };
         setAddedProducts(updatedProducts);
       }
@@ -63,19 +69,22 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
       // Update total cost
       setTotalCost((prev) => prev + quantity * price);
 
-      // Reset quantity input field
+      console.log("added", addedProducts);
       setQuantity("");
     } else {
       alert("Please enter both quantity and price.");
     }
   };
 
-  const handleSelectProduct = (e) => {
-    const price = availableProducts.find(
-      (prod) => prod.matId.toString() === e.target.value
+  const handleSelectProduct = (id) => {
+    console.log(id);
+    const product = availableProducts.find(
+      (prod) => prod.matId.toString() === id.toString()
     );
-    setSelectedProduct(e.target.value); // Set selected product ID
-    setSelectedPrice(price.price);
+
+    console.log(product);
+    setSelectedProduct(product); // Set selected product ID
+    setSelectedPrice(product.price);
   };
 
   // Handle removing products from the order
@@ -112,8 +121,10 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
       products: addedProducts,
       totalCost,
     };
+
+    console.log(addedProducts);
     console.log(orderDetails);
-    onAdd(orderDetails); 
+    onAdd(orderDetails);
     onClose(); // Close modal after submission
   };
 
@@ -145,8 +156,8 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
               <label>Select Product:</label>
               <select
                 id="product-select"
-                value={selectedProduct}
-                onChange={handleSelectProduct}
+                value={selectedProduct.matId || ""}
+                onChange={(e) => handleSelectProduct(e.target.value)}
               >
                 <option value="">Select a Product</option>
                 {availableProducts.map((product) => (
@@ -163,7 +174,6 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
                 placeholder="Quantity"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                
               />
               <span> </span>
               <label>Price:</label>
@@ -181,12 +191,12 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
                 onClick={() => {
                   const productId =
                     document.getElementById("product-select").value;
-                  const quantity = document.getElementById("quantity-input").value;
+                  const quantity =
+                    document.getElementById("quantity-input").value;
                   const price = document.getElementById("price-input").value;
 
-                  // Add product to the list
                   handleAddProduct(
-                    productId,
+                    selectedProduct.matId,
                     parseInt(quantity),
                     parseFloat(price)
                   );
@@ -207,8 +217,7 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
                 {addedProducts.map((item, index) => (
                   <li key={index}>
                     {
-                      availableProducts.find((p) => p.matId === item.productId)
-                        ?.matName
+                      item.matName
                     }{" "}
                     - ₱{item.price} x {item.quantity} = ₱{item.total.toFixed(2)}
                     <button
@@ -231,7 +240,9 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
 
           {/* Submit button */}
           <div className="modal-footer">
-            <button type="submit" onClick={handleSubmit}>Place Order</button>
+            <button type="submit" onClick={handleSubmit}>
+              Place Order
+            </button>
             <button type="button" onClick={onClose}>
               Cancel
             </button>

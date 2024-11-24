@@ -11,3 +11,90 @@
     align-items: center;
     justify-content: start;
 }
+
+
+.btnDefault {
+  background-color: #ff2828;
+  border-radius: 10px;
+  color: white;
+  border: 0px;
+  padding: 0.5rem;
+}
+
+.td {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+}
+
+.modal75 {
+  display: flex;
+  width: 90%;
+}
+
+.div75 {
+  height: 20rem;
+  overflow-y: auto; /* Enable vertical scrolling */
+}
+
+.buttonRemove {
+  background-color: #ff2828;
+  color: white;
+  width: 30px;
+  height: 30px;
+}
+
+.buttonRemove:hover {
+  background-color: red;
+  color: white;
+  width: 30px;
+  height: 30px;
+}
+
+.buttonRemove:active {
+  background-color: red;
+  color: white;
+  width: 30px;
+  height: 30px;
+}
+
+
+
+.buttonView {
+  width: 30px;
+  height: 30px;
+}
+
+.badge-completed {
+  background-color: #28a745; /* Green for completed */
+  color: white;
+  padding: 0.3rem;
+  border-radius: 5px;
+}
+
+.badge-transit {
+  background-color: #5a189a; /* Green for completed */
+  color: white;
+  padding: 0.3rem;
+  border-radius: 5px;
+}
+
+.badge-pending {
+  background-color: #ffc107; /* Yellow for pending */
+  color: white;
+  padding: 0.3rem;
+  border-radius: 5px;
+}
+
+/* CANCELLED BADGE */
+.badge-cancelled {
+  background-color: red; 
+  color: white;
+  padding: 0.3rem;
+  border-radius: 5px;
+}
+
+.btnTopButton {
+  height: 10px;
+  width: 10px;
+}

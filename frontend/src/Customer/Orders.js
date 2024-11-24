@@ -23,84 +23,169 @@ function Orders() {
   const openViewMyCart = () => setMyCart(true);
   const closeViewMyCart = () => setMyCart(false);
 
+  const openCancelModal = (order_id) => {
+    setCancelModal(true);
+    setOrderId(order_id);
+    console.log("==>", order_id);
+  };
+  const closeCancelModal = () => setCancelModal(false);
+
+  const openViewOrder = (order_id) => {
+    setViewOrderModal(true);
+    setOrderId(order_id);
+    fetchOrderedProducts(order_id);
+  };
+  const closeViewOrder = () => setViewOrderModal(false);
+
   const [items, setItems] = useState([]); // Store fetched items
+  const [cartItems, setCartItems] = useState([]); // Store fetch (My Cart)
+  const [orderProd, setOrderProd] = useState([]); // Fetch orders by customer_id
+  const [viewOrder, setViewOrder] = useState([]); // Fetch products of order
+  const [mopArray, setMopArray] = useState([]); // Fetch MOP
+
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [itemName, setItemName] = useState("");
-
   const [qty, setQty] = useState("1"); // from database
   const [totalPrice, setTotalPrice] = useState(""); // from quantity input
+  const [showFileInput, setShowFileInput] = useState(false);
 
   const [quantity, setQuantity] = useState(0);
 
   const [selectedProduct, setSelectedProduct] = useState("");
-
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerLoc, setCustomerLoc] = useState("");
 
+  const [payment, setPayment] = useState(""); // MOP (cash, gcash);
+  const [refNo, setRefNo] = useState("");
+
+  const [cancelModal, setCancelModal] = useState(false);
+  const [viewOrderModal, setViewOrderModal] = useState(false);
+  const [showMOP, setShowMOP] = useState(false); // Fetch products of order
+
   const userId = localStorage.getItem("id"); // get ID of customer.;
 
+  const [orderId, setOrderId] = useState("");
+
+  //calculate total price
+  const totalSum = cartItems.reduce((sum, item) => sum + item.total_price, 0);
+
+  const fetchCustomerName = async () => {
+    if (!userId) {
+      console.log("User ID not found in localStorage.");
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `${apiUrl}/api-get-customer-info/${userId}`
+      ); // API call
+      if (response.data.status === "success") {
+        setCustomerId(userId);
+        setCustomerName(response.data.res.name || "");
+        setCustomerLoc(response.data.res.location || "");
+      } else {
+        throw new Error("Failed to fetch customer name");
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  };
+
+  const fetchItems = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/api-items`);
+      if (response.data.status === "success") {
+        setItems(response.data.res);
+      } else {
+        throw new Error("No items found");
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  };
+
+  const fetchMyCart = async () => {
+    try {
+      const res = await axios.get(`${apiUrl}/mycart/${userId}`);
+      if (res.data.status === "success") {
+        console.log(res.data.res);
+        setCartItems(res.data.res);
+      } else {
+        throw new Error("No products found.");
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  };
+
+  const fetchOrders = async () => {
+    try {
+      const res = await axios.get(`${apiUrl}/orders_customer/${userId}`);
+      if (res.data.status === "success") {
+        console.log("ORDER: ", res.data.res);
+        setOrderProd(res.data.res);
+      } else {
+        throw new Error("No orders found.");
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  };
+
+  const fetchOrderedProducts = async (orderId) => {
+    try {
+      const res = await axios.post(`${apiUrl}/orders_products/`, {
+        userId,
+        orderId,
+      });
+
+      if (res.data.status === "success") {
+        setViewOrder(res.data.res);
+        console.log(res.data.res);
+      } else {
+        throw new Error("No order products found.");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const fetchMOP = async () => {
+    try {
+      const res = await axios.get(`${apiUrl}/fetchmop/`);
+      if (res.data.status === "success") {
+        console.log(res.data.res);
+        setMopArray(res.data.res); // Populate the MOP array with data
+      } else {
+        throw new Error("No modes of payment found.");
+      }
+    } catch (err) {
+      console.error("Error fetching modes of payment:", err.message);
+    }
+  };
+
   useEffect(() => {
-    const fetchCustomerName = async () => {
-      if (!userId) {
-        console.log("User ID not found in localStorage.");
-        return;
-      }
-
-      try {
-        const response = await axios.get(
-          `${apiUrl}/api-get-customer-info/${userId}`
-        ); // API call
-        if (response.data.status === "success") {
-          setCustomerId(userId);
-          setCustomerName(response.data.res.name || "");
-          setCustomerLoc(response.data.res.location || "");
-        } else {
-          throw new Error("Failed to fetch customer name");
-        }
-      } catch (err) {
-        console.log(err.message);
-      }
-    };
-
     fetchCustomerName();
-  }, []);
-
-  useEffect(() => {
-    const fetchItems = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/api-items`);
-        if (response.data.status === "success") {
-          setItems(response.data.res);
-        } else {
-          throw new Error("No items found");
-        }
-      } catch (err) {
-        console.log(err.message);
-      }
-    };
-
+    fetchOrders();
     fetchItems();
+    fetchMyCart();
+    fetchOrderedProducts();
+    fetchMOP();
   }, []);
 
-  const [cartItems, setCartItems] = useState([]);
-  useEffect(() => {
-    const fetchMyCart = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/mycart/${userId}`);
-        if (res.data.status === "success") {
-          console.log(res.data.res);
-          setCartItems(res.data.res);
-        } else {
-          throw new Error("No products found.");
-        }
-      } catch (err) {
-        console.log(err.message);
-      }
-    };
-    fetchMyCart();
-  }, []);
+  const removeProdCart = async (item_id) => {
+    try {
+      const res = await axios.delete(`${apiUrl}/remove-prod-cart`, {
+        data: { item_id, user_id: userId },
+      });
+      console.log(res.data);
+      fetchMyCart();
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   const resetFields = () => {
     setAddToCart(false);
@@ -187,8 +272,8 @@ function Orders() {
         insertCartData
       );
       if (response.status === 200) {
-        console.log(response);
         toast.success(response.data.message);
+        fetchMyCart();
       } else {
         alert("Failed to place order.");
       }
@@ -202,35 +287,164 @@ function Orders() {
     resetFields();
   };
 
+  const handleCheckOut = async () => {
+    try {
+      const res = await axios.post(`${apiUrl}/checkout_cus`, {
+        userId,
+        payment,
+        refNo,
+        cartItems,
+        totalSum,
+        customerId,
+        customerName,
+        customerLoc,
+      });
+
+      if (res.status === 200) {
+        toast.success("Order placed successfully.");
+        setCartItems([]);
+        setShowMOP(false);
+        setMyCart(false);
+        fetchOrders();
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Checkout failed. Please try again.");
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    try {
+      const res = await axios.post(`${apiUrl}/cancelled_order`, { orderId });
+      if (res.status === 200) {
+        toast.success("Order cancelled successfully.");
+        fetchOrders();
+        closeCancelModal();
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // HANDLE PAYMENT IN MOP
+  const handlePaymentChange = (e) => {
+    const selectedValue = e.target.value;
+
+    setPayment(selectedValue);
+
+    // Find the selected mop item in mopArray
+    const selectedMop = mopArray.find(
+      (mopItem) => mopItem.mop === selectedValue
+    );
+
+    // Show file input if attach_file === "1"
+    if (selectedMop.attach_file == "1") {
+      console.log("true");
+      setShowFileInput(true);
+    } else {
+      console.log("false");
+      setShowFileInput(false);
+    }
+  };
+
   return (
     <div className="container1">
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="d-flex w-100 justify-content-between">
-          <button
-            className={`${style.btnDefault}`}
-            onClick={openAddToCartModal}
-          >
-            <i className="fa-solid fa-add"></i> Buy Products
-          </button>
-          <button className="btn btn-success" onClick={openViewMyCart}>
-            <i class="fa fa-shopping-cart"></i>
-          </button>
+        <div className="d-flex w-100 justify-content-between p-2">
+          <div className="d-flex w-100 justify-content-start">
+            <h5>
+              <strong>Orders</strong>
+            </h5>
+          </div>
+          <div className="d-flex w-100 justify-content-end align-items-center gap-2">
+            <button
+              className={`${style.btnTopButton} btn d-flex align-items-center justify-content-center`}
+              onClick={openAddToCartModal}
+            >
+              <i className="fa-solid fa-add"></i>
+            </button>
+            <button
+              className={`${style.btnTopButton} btn d-flex align-items-center justify-content-center`}
+              onClick={openViewMyCart}
+            >
+              <i class="fa fa-shopping-cart"></i>
+            </button>
+          </div>
         </div>
 
         <div className="table-list">
           <table className="table">
             <thead>
               <tr>
-                <th>Item name</th>
-                <th>Price</th>
-                <th>Description</th>
-                <th>Quantity</th>
+                <th>Order ID</th>
+                <th>Total Price</th>
+                <th>Date Order</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody>
+              {orderProd.length === 0 ? (
+                <tr>
+                  <td colSpan="6">NO ORDERS PLACED.</td>
+                </tr>
+              ) : (
+                orderProd.map((product, index) => (
+                  <tr key={index}>
+                    <td className="w-25 text-start align-middle ">
+                      <span className="me-2">{product.order_id}</span>
+                      <strong>
+                        <i>{product.mop}</i>
+                      </strong>
+                    </td>
+                    <td className="w-25 text-start align-middle">
+                      {new Intl.NumberFormat("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      }).format(product.total_sum_price)}
+                    </td>
+                    <td className="align-middle">{product.date}</td>
+                    <td className="align-middle">
+                      <span
+                        className={`${
+                          style[`badge-${product.status.toLowerCase()}`]
+                        }`}
+                      >
+                        <strong>{product.status}</strong>
+                      </span>
+                    </td>
+
+                    <td className="align-middle">
+                      <div className="d-flex align-items-center justify-content-center gap-2">
+                        <button
+                          className={`${style.buttonRemove} btn btn-danger d-flex align-items-center justify-content-center`}
+                          onClick={() => openCancelModal(product.order_id)}
+                        >
+                          <i
+                            className="fa fa-ban"
+                            style={{ fontSize: "15px" }}
+                          ></i>
+                        </button>
+
+                        <button
+                          className={`${style.buttonView} btn btn-primary d-flex align-items-center justify-content-center`}
+                          onClick={() => {
+                            openViewOrder(product.order_id);
+                          }}
+                        >
+                          <i
+                            className="fa fa-eye"
+                            style={{ fontSize: "15px" }}
+                          ></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
           </table>
         </div>
       </div>
@@ -239,10 +453,12 @@ function Orders() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div class="modal-header d-flex w-100 justify-content-between">
-              <h5 class="modal-title">Add to Cart</h5>
+              <h5 class="modal-title">
+                <strong>Add to Cart</strong>
+              </h5>
               <button
                 type="button"
-                className="btn-close"
+                className="btn-close bg-light"
                 onClick={closeAddToCartModal}
               ></button>
             </div>
@@ -269,7 +485,7 @@ function Orders() {
                   onChange={handleSelectItems}
                 >
                   <option value="">Select a Product</option>
-                  {items.map((item) => (
+                  {items?.map((item) => (
                     <option key={item.itemId} value={item.itemId}>
                       {item.itemName}
                     </option>
@@ -293,7 +509,10 @@ function Orders() {
                       type="text"
                       className="w-100"
                       placeholder="Price"
-                      value={price}
+                      value={new Intl.NumberFormat("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      }).format(price)}
                       readOnly
                     />
                   </div>
@@ -328,7 +547,15 @@ function Orders() {
               <div className="d-flex justify-content-end w-100"></div>
 
               <div className="total-price d-flex w-100 justify-content-end">
-                <p>Total Price: ₱{totalPrice}</p>
+                <p>
+                  Total Price:{" "}
+                  <strong>
+                    {new Intl.NumberFormat("en-PH", {
+                      style: "currency",
+                      currency: "PHP",
+                    }).format(totalPrice)}
+                  </strong>
+                </p>
               </div>
 
               <button
@@ -348,17 +575,19 @@ function Orders() {
       {/* MODAL FOR VIEW CART */}
       {showMyCart && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className={`${style.modal75} modal-content`}>
             <div class="modal-header d-flex w-100 justify-content-between">
-              <h5 class="modal-title">My Cart</h5>
+              <h5 class="modal-title">
+                <strong>My Cart</strong>
+              </h5>
               <button
                 type="button"
-                className="btn-close"
+                className="btn-close bg-light"
                 onClick={closeViewMyCart}
               ></button>
             </div>
-            <div className="d-flex w-100">
-              <div className="table-list w-100">
+            <div className="overflow-hidden">
+              <div className={`${style.div75} table-list w-100`}>
                 <table className="table">
                   <thead>
                     <tr>
@@ -373,19 +602,159 @@ function Orders() {
                   <tbody>
                     {cartItems.length === 0 ? (
                       <tr>
-                        <td colSpan="5">No items in cart</td>
+                        <td colSpan="6">NO PRODUCTS IN CART.</td>
                       </tr>
                     ) : (
-                      cartItems.map((item, index) => (
+                      cartItems?.map((item, index) => (
                         <tr key={index}>
-                          <td>{item.item_name}</td>
-                          <td>{item.description}</td>
-                          <td>{item.price}</td>
-                          <td>{item.qty}</td>
-                          <td>{item.total_price}</td>
+                          <td className="w-25 text-start align-middle">
+                            {item.item_name}
+                          </td>
+                          <td className="w-25 text-start align-middle">
+                            {item.description}
+                          </td>
+                          <td className="align-middle">
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(item.price)}
+                          </td>
+                          <td className="align-middle">{item.qty}</td>
+                          <td className="align-middle">
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(item.total_price)}
+                          </td>
 
-                          <td>
-                            <button className="btn btn-primary">Order</button>
+                          <td className="align-middle">
+                            <div className="d-flex align-items-center justify-content-center">
+                              <button
+                                className={`${style.buttonRemove} btn btn-danger d-flex align-items-center justify-content-center`}
+                                onClick={() => removeProdCart(item.item_id)}
+                              >
+                                <i
+                                  className="fa fa-trash"
+                                  style={{ fontSize: "15px" }}
+                                ></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="d-flex justify-content-between w-100 mt-2">
+              <div className="d-flex gap-2">
+                <h3>Total:</h3>
+
+                <h3>
+                  {new Intl.NumberFormat("en-PH", {
+                    style: "currency",
+                    currency: "PHP",
+                  }).format(totalSum)}
+                </h3>
+              </div>
+              <button
+                className={`${style.btnDefault}`}
+                onClick={() => {
+                  setShowMOP(true);
+                }}
+              >
+                Check out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal for cancelling a order*/}
+      {cancelModal && (
+        <div className="modal-overlay">
+          <div
+            className={`modal-content d-flex w-25 flex-column justify-content-center align-items-center`}
+          >
+            <div className="d-flex justify-content-center w-100 flex-column">
+              <h6>
+                <strong>You're about to cancel your order.</strong>
+              </h6>
+              <span>Are you sure you want to cancel your order?</span>
+            </div>
+
+            <div className="d-flex w-100 justify-content-end gap-2">
+              <button
+                className="btn btn-light"
+                onClick={() => {
+                  closeCancelModal();
+                }}
+              >
+                Discard
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  handleCancelOrder(orderId);
+                }}
+              >
+                Cancel it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {viewOrderModal && (
+        <div className="modal-overlay">
+          <div className={`modal-content d-flex justify-content-between w-100`}>
+            <div class="modal-header d-flex w-100 justify-content-between">
+              <h5>
+                <strong>Ordered Products</strong>
+              </h5>
+              <button
+                type="button"
+                className="btn-close bg-light"
+                onClick={closeViewOrder}
+              ></button>
+            </div>
+            <div className="overflow-hidden">
+              <div className={`${style.div75} table-list w-100`}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Item name</th>
+                      <th>Description</th>
+                      <th>Price</th>
+                      <th>Quantity</th>
+                      <th>Total Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewOrder?.length === 0 ? (
+                      <tr>
+                        <td colSpan="6">NO PRODUCTS FOUND.</td>
+                      </tr>
+                    ) : (
+                      viewOrder?.map((item, index) => (
+                        <tr key={index}>
+                          <td className="w-25 text-start align-middle">
+                            {item.item_name}
+                          </td>
+                          <td className="w-25 text-start align-middle">
+                            {item.description}
+                          </td>
+                          <td className="align-middle">
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(item.price)}
+                          </td>
+                          <td className="align-middle">{item.quantity}</td>
+                          <td className="align-middle">
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(item.total_price)}
                           </td>
                         </tr>
                       ))
@@ -395,6 +764,71 @@ function Orders() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {/* Showing mode of payment modal */}
+      {showMOP && (
+        <div className="modal-overlay">
+          <form
+            className={`modal-content d-flex w-25 flex-column justify-content-center align-items-center`}
+            onSubmit={(e) => {
+              e.preventDefault(); // Prevent default form submission
+              handleCheckOut(); // Call your checkout handler
+            }}
+          >
+            <div className="d-flex justify-content-center w-100 flex-column">
+              <span>
+                Choose your <strong>mode of payment:</strong>
+              </span>
+
+              <select
+                value={payment}
+                onChange={handlePaymentChange}
+                required
+                className="form-select mt-2"
+              >
+                <option value="" disabled>
+                  Select payment method
+                </option>
+                {mopArray.map((mopItem, index) => (
+                  <option key={index} value={mopItem.mop}>
+                    {mopItem.mop}
+                  </option>
+                ))}
+              </select>
+
+              {/* Conditionally render "Insert file" */}
+              {showFileInput && (
+                <div className="mt-3">
+                  <span>Enter reference number: </span>
+                  <input
+                    className="form-control mt-2"
+                    type="text"
+                    required
+                    value={refNo}
+                    onChange={(e) => setRefNo(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="d-flex w-100 justify-content-end gap-2 mt-3">
+              <button
+                type="button"
+                className="btn btn-light"
+                onClick={() => {
+                  setShowMOP(false);
+                  setPayment("");
+                  setShowFileInput(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-danger">
+                Place Order
+              </button>
+            </div>
+          </form>
         </div>
       )}
       <ToastContainer />;

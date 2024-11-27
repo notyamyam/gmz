@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -6,6 +5,7 @@ import "../css/style.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell, faUser } from "@fortawesome/free-solid-svg-icons";
 import apiUrl from "../ApiUrl/apiUrl";
+import moment from "moment"; // Import moment to format dates
 
 function Header() {
   const navigate = useNavigate();
@@ -17,20 +17,30 @@ function Header() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Fetch notifications with a limit of 10
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/documents/notifications`);
- 
+      await axios.get(`${apiUrl}/documents/notifications`); // Insert notifications into DB (if necessary)
+    } catch (error) {
+      console.error("Error inserting notifications:", error);
+    }
+
+    try {
+      const response = await axios.get(
+        `${apiUrl}/documents/getnotifications?limit=10`
+      );
       setNotifications(response.data);
-      setUnreadCount(response.data.length); // Assuming all are unread initially
+      setUnreadCount(
+        response.data.filter((notif) => notif.status === 0).length
+      ); // Count only unread notifications
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
   };
+
   useEffect(() => {
-   
     fetchNotifications();
-  }, [notifications]);
+  }, []);
 
   // Handle logout
   async function handleLogout() {
@@ -64,6 +74,18 @@ function Header() {
     };
   }, []);
 
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      await axios.post(`${apiUrl}/documents/mark-as-read`, {
+        id: notificationId,
+      });
+      fetchNotifications(); // Refresh notifications after marking as read
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
   return (
     <div className="header">
       <div>
@@ -78,8 +100,7 @@ function Header() {
           className="icon-button"
           id="notificationButton"
           onClick={() => {
-            console.log("Notification button clicked!");
-            setNotificationOpen(!isNotificationOpen);
+            setNotificationOpen(true); // Show the modal on click
           }}
         >
           <FontAwesomeIcon icon={faBell} />
@@ -98,29 +119,6 @@ function Header() {
           <FontAwesomeIcon icon={faUser} />
         </button>
 
-        {/* Notification Dropdown */}
-        <div
-          className={`dropdown-notif ${isNotificationOpen ? "open" : ""}`}
-          ref={notificationDropdownRef}
-        >
-          {isNotificationOpen && notifications.length > 0 ? (
-            notifications.map((notif, index) => (
-              <a
-                key={index}
-                href="#"
-                onClick={() => {
-                  setUnreadCount(unreadCount - 1); // Adjust unread count
-                }}
-              >
-                <strong>{notif.documentName}</strong> ({notif.category}) - Expiring on{" "}
-                {notif.expirationDate}
-              </a>
-            ))
-          ) : (
-            <span>No new notifications</span>
-          )}
-        </div>
-
         {/* User Dropdown */}
         {isUserDropdownOpen && (
           <div className="dropdown-user" ref={userDropdownRef}>
@@ -131,6 +129,80 @@ function Header() {
             </a>
           </div>
         )}
+      </div>
+
+      {/* Bootstrap Modal for Notifications */}
+      <div
+        className={`modal ${isNotificationOpen ? "show" : ""}`}
+        tabIndex="-1"
+        style={{ display: isNotificationOpen ? "block" : "none" }}
+        aria-labelledby="notificationModalLabel"
+        aria-hidden={!isNotificationOpen}
+      >
+        <div className="modal-dialog-xl">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="notificationModalLabel">
+                Notifications
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+                onClick={() => setNotificationOpen(false)} // Close modal
+              ></button>
+            </div>
+            <div className="modal-body">
+              {notifications.length > 0 ? (
+                notifications.map((notif, index) => (
+                  <div
+                    key={index}
+                    className={`notification-item ${
+                      notif.status === 1 ? "read" : "unread"
+                    }`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <li
+                      style={{
+                        fontWeight: notif.status === 1 ? "normal" : "bold",
+                        margin: "0",
+                        fontSize: "0.8rem", // Reduce font size here
+                      }}
+                    >
+                      {notif.description}
+                    </li>
+
+                    {notif.status === 0 && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => markAsRead(notif.id)}
+                      >
+                        <i className="fa-solid fa-check"></i>
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <span>No new notifications</span>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setNotificationOpen(false)} // Close modal
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

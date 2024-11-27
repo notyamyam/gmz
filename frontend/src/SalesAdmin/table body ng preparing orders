@@ -1,0 +1,14 @@
+ {orders.map((order, index) => (
+                  <tr key={order.orderId}>
+                    <td>{index + 1}</td>
+                    <td>{order.customerName}</td>
+                    <td>{getItemNameById(order.itemId)}</td>{" "}
+                    {/* Get item name */}
+                    <td>{order.quantity}</td>
+                    <td>
+                      <button className="btn">
+                        <i className="fa-solid fa-check"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}

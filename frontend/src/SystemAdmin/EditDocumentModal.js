@@ -10,15 +10,21 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
+  const [effectiveDate, setDateEffective] = useState("");
   const [description, setDescription] = useState("");
 
-  // Pre-fill document details when the modal opens
+  const formatDate = (date) => {
+    if (!date) return ""; // Handle empty or null dates
+    const d = new Date(date);
+    return d.toISOString().split("T")[0]; // Extract "YYYY-MM-DD"
+  };
   useEffect(() => {
     if (isOpen && document) {
-      setDocumentName(document.documentName);
-      setSelectedCategory(document.category);
-      setExpirationDate(document.expirationDate);
-      setDescription(document.description);
+      setDocumentName(document.documentName || "");
+      setSelectedCategory(document.category || "");
+      setExpirationDate(formatDate(document.expirationDate) || "");
+      setDateEffective(formatDate(document.dateEffective) || "");
+      setDescription(document.description || "");
 
       // Fetch categories
       axios
@@ -50,6 +56,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
       formData.append("documentFile", documentFile); // Only append the file if updated
     }
     formData.append("category", selectedCategory);
+    formData.append("dateEffective", effectiveDate);
     formData.append("expirationDate", expirationDate);
     formData.append("description", description);
 
@@ -59,7 +66,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
           "Content-Type": "multipart/form-data",
         },
       });
-    
+
       onEdit(); // Refresh the document list
       onClose(); // Close the modal
     } catch (error) {
@@ -84,7 +91,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
             disabled={!documentFile} // Allow editing only if a new file is uploaded
             required
           />
-           <label>Upload new file</label>
+          <label>Upload new file</label>
           <input
             type="file"
             accept="application/pdf"
@@ -105,6 +112,14 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
               </option>
             ))}
           </select>
+          <label>New Effective Date</label>
+          <input
+            type="date"
+            placeholder="Effective Date"
+            value={effectiveDate}
+            onChange={(e) => setDateEffective(e.target.value)}
+            required
+          />
           <label>New Expiration Date</label>
           <input
             type="date"

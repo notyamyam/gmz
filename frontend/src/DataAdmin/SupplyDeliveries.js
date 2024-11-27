@@ -42,7 +42,6 @@ function SupplyDeliveries() {
       await axios
         .get(`${apiUrl}/supDeli`)
         .then((res) => {
-     
           setSupDeli(res.data);
         })
         .catch((err) => console.log(err));
@@ -68,6 +67,7 @@ function SupplyDeliveries() {
         setAddModalOpen(false);
       })
       .catch((error) => {
+        toast.error(error.response.data.message);
         console.error("Error placing order:", error);
       });
   };
@@ -95,8 +95,6 @@ function SupplyDeliveries() {
         orderId: item.orderId,
       });
 
-
-
       const { allItemsReceived, message } = response.data;
 
       // Show a success message
@@ -104,6 +102,8 @@ function SupplyDeliveries() {
 
       fetchData();
       setIsConfirmModalOpen(false);
+      setIsView(false);
+      
     } catch (error) {
       console.error("Error updating item or order status:", error);
       toast.error("Failed to update item.");
@@ -236,9 +236,9 @@ function SupplyDeliveries() {
           <div className="table-list">
             <table>
               <tbody>
-                {supDeli.map((delivery, index) => (
-                  <tr key={delivery.supDeliId}>
-                    <td>{index + 1}</td>
+                {supDeli?.map((delivery, index) => (
+                  <tr key={index}>
+                    <td>{delivery.orderId}</td>
                     <td>{delivery.supplyName}</td>
 
                     <td>{delivery.totalQuantity}</td>

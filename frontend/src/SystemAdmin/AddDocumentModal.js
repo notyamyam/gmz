@@ -5,11 +5,20 @@ import apiUrl from "../ApiUrl/apiUrl";
 import { toast } from "react-toastify";
 
 const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
+  function getTodayDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   const [documentName, setDocumentName] = useState("");
   const [documentFile, setDocumentFile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [dateUploaded, setDateUploaded] = useState("");
+  const [dateUploaded, setDateUploaded] = useState(getTodayDate());
+  const [effectiveDate, setDateEffective] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [description, setDescription] = useState("");
 
@@ -49,6 +58,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
     formData.append("documentFile", documentFile);
     formData.append("category", selectedCategory);
     formData.append("dateUploaded", dateUploaded);
+    formData.append("dateEffective", effectiveDate);
     formData.append("expirationDate", expirationDate);
     formData.append("description", description);
 
@@ -74,7 +84,10 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
   return (
     <div id="addModal" className="modal-overlay">
       <div className="modal-content">
-        <h2>Add New Document</h2>
+        <div class="title-container">
+          <h2>Add New Document</h2>
+          <h2>{dateUploaded}</h2>
+        </div>
         <form onSubmit={handleSubmit}>
           <label>File Name</label>
           <input
@@ -106,12 +119,12 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
               </option>
             ))}
           </select>
-          <label>Date Uploaded</label>
+          <label>Date Effective</label>
           <input
             type="date"
             placeholder="Date Uploaded"
-            value={dateUploaded}
-            onChange={(e) => setDateUploaded(e.target.value)}
+            value={effectiveDate}
+            onChange={(e) => setDateEffective(e.target.value)}
             required
           />
           <label>Date expiry</label>

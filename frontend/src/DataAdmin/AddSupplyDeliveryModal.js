@@ -122,10 +122,28 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
       totalCost,
     };
 
-    console.log(addedProducts);
-    console.log(orderDetails);
     onAdd(orderDetails);
-    onClose(); // Close modal after submission
+    setSelectedSupplier("");
+    setAvailableProducts([]);
+    setAddedProducts([]);
+    setTotalCost(0);
+    setSelectedProduct([]);
+    setSelectedPrice(0);
+    setQuantity("");
+
+    // Close modal after submission
+    onClose();
+  };
+
+  const onCancel = () => {
+    onClose();
+    setSelectedSupplier("");
+    setAvailableProducts([]);
+    setAddedProducts([]);
+    setTotalCost(0);
+    setSelectedProduct([]);
+    setSelectedPrice(0);
+    setQuantity("");
   };
 
   if (!isOpen) return null;
@@ -136,8 +154,9 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
         <h2>Order Products from Supplier</h2>
         <form onSubmit={handleSubmit}>
           {/* Supplier selection */}
-          <label>Select Supplier:</label>
+          <label hidden={selectedSupplier}>Select Supplier:</label>
           <select
+            hidden={selectedSupplier}
             value={selectedSupplier}
             onChange={(e) => setSelectedSupplier(e.target.value)}
             required
@@ -216,10 +235,8 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
               <ul>
                 {addedProducts.map((item, index) => (
                   <li key={index}>
-                    {
-                      item.matName
-                    }{" "}
-                    - ₱{item.price} x {item.quantity} = ₱{item.total.toFixed(2)}
+                    {item.matName} - ₱{item.price} x {item.quantity} = ₱
+                    {item.total.toFixed(2)}
                     <button
                       type="button"
                       onClick={() => handleRemoveProduct(item.productId)}
@@ -243,7 +260,7 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
             <button type="submit" onClick={handleSubmit}>
               Place Order
             </button>
-            <button type="button" onClick={onClose}>
+            <button type="button" onClick={onCancel}>
               Cancel
             </button>
           </div>

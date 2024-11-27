@@ -75,6 +75,7 @@ function Production() {
   };
 
   const confirmDeleteItem = (item) => {
+    console.log(item);
     setItemToDelete(item); // Set the item to be deleted
     setDeleteModalOpen(true); // Open the delete modal
   };
@@ -186,7 +187,7 @@ function Production() {
               <thead>
                 <tr>
                   <th onClick={() => handleSort("itemId")}>#</th>
-                  <th onClick={() => handleSort("itemId")}>Item</th>
+                  <th onClick={() => handleSort("itemName")}>Item</th>
                   <th onClick={() => handleSort("quantityProduced")}>
                     Quantity Produced
                   </th>
@@ -203,10 +204,10 @@ function Production() {
           <div className="table-list">
             <table>
               <tbody>
-                {filteredProductions.map((production, index) => (
-                  <tr key={production.productionId}>
-                    <td>{index + 1}</td>
-                    <td>{getItemName(production.itemId)}</td>
+                {filteredProductions?.map((production, index) => (
+                  <tr key={index}>
+                    <td>{production.productionId}</td>
+                    <td>{production.itemName}</td>
                     <td>{production.quantityProduced}</td>
                     <td>{formatDate(production.productionDate)}</td>
                     <td>{production.staffName}</td>

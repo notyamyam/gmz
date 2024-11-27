@@ -82,6 +82,7 @@ const LoginPortal = () => {
                 </div>
                 <br />
                 <input type="submit" value="Login" />
+                <a href="/register" class="btn-done" >Register here</a>
               </form>
             </div>
           </div>

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPortal from "./login/LoginPortal";
+import RegisterPortal from "./login/RegisterPortal";
 import SystemAdmin from "./login/SystemAdmin";
 import SystemAdminDashboard from "./SystemAdmin/Dashboard";
 import SystemAdminDocuments from "./SystemAdmin/Document";
@@ -25,7 +25,9 @@ import SalesAdmin from "./login/SalesAdmin";
 import SalesAdminDashboard from "./SalesAdmin/Dashboard";
 import SalesAdminOrder from "./SalesAdmin/Order";
 import PerparingOrders from "./SalesAdmin/PreparingOrders.js";
-import DeliveryOrders from "./SalesAdmin/DeliveryOrder.js";
+import PreparedOrders from "./SalesAdmin/Prepared.js";
+import Ready from "./SalesAdmin/ReadyToGo.js";
+import Delivery from "./SalesAdmin/Delivery.js";
 import Sales from "./SalesAdmin/Sales.js";
 import Cancelled from "./SalesAdmin/Cancelled.js";
 
@@ -75,7 +77,7 @@ const App = () => {
     <div className="App">
       <BrowserRouter>
         <Routes>
-          {/* Login page should only be accessible if no access token is found */}
+          <Route path="/register" element={<RegisterPortal />} />
           <Route
             path="/"
             element={
@@ -259,9 +261,19 @@ const App = () => {
             }
           />
           <Route
-            path="/sales-admin/on-delivery"
+            path="/sales-admin/prepared"
             element={
-              <ProtectedRoute element={<DeliveryOrders />} requiredAccess="3" />
+              <ProtectedRoute element={<PreparedOrders />} requiredAccess="3" />
+            }
+          />
+          <Route
+            path="/sales-admin/ready"
+            element={<ProtectedRoute element={<Ready />} requiredAccess="3" />}
+          />
+          <Route
+            path="/sales-admin/delivery"
+            element={
+              <ProtectedRoute element={<Delivery />} requiredAccess="3" />
             }
           />
           <Route
@@ -317,7 +329,6 @@ const App = () => {
       </BrowserRouter>
     </div>
   );
-
 };
 
 export default App;

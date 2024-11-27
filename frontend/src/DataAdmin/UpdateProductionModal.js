@@ -152,7 +152,7 @@ function UpdateProductionModal({
             </form>
 
             {/* Display Insufficient Materials */}
-            {insufficientMaterials.length > 0 && (
+            {insufficientMaterials?.length > 0 && (
               <div className="insufficient-materials">
                 <h3>Insufficient Materials</h3>
                 <ul>

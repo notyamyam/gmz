@@ -906,3 +906,24 @@ th i {
 .badge-cancelled {
   background-color: red; /* Yellow for pending */
 }
+
+.tooltip-table .pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.tooltip-table button {
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tooltip-table button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

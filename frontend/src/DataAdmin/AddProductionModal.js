@@ -95,7 +95,7 @@ function AddProductionModal({ isOpen, onClose, items, onAdd }) {
           </button>
         </form>
 
-        {insufficientMaterials.length > 0 && (
+        {insufficientMaterials?.length > 0 && (
           <div className="insufficient-materials">
             <h3>Insufficient Materials</h3>
             <ul>

@@ -4,8 +4,6 @@ import Header from "../BG/SalesAdminHeader";
 import Sidebar from "../BG/SalesAdminSidebar";
 import axios from "axios";
 import moment from "moment";
-import AddOrderModal from "./AddOrderModal";
-import EditOrderModal from "./EditOrderModal";
 import apiUrl from "../ApiUrl/apiUrl";
 
 function Order() {
@@ -28,13 +26,11 @@ function Order() {
   const [viewPendingModal, setViewPendingModal] = useState(false);
   const [viewPendingOrders, setViewPendingOrders] = useState([]);
 
-  const openViewPendingOrders = (user_id, order_id, ref_no, total_price) => {
+  const [chooseRiderModal, setChooseRiderModal] = useState(false);
+
+  const openViewPendingOrders = (data) => {
+    setViewPendingOrders(data);
     setViewPendingModal(true);
-    setUserId(user_id);
-    setOrderId(order_id);
-    setRefNo(ref_no);
-    setTotalPrice(total_price);
-    fetchPendingOrderedProducts(user_id, order_id, ref_no, total_price);
   };
   const closeViewPendingOrders = () => setViewPendingModal(false);
 
@@ -50,51 +46,35 @@ function Order() {
 
   const fetchPendingOrders = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/pendingOrders`);
-      console.log("fetch pending orders: ", res.data.res);
+      const res = await axios.get(`${apiUrl}/pending_Orders`);
+      console.log(res);
       setPendingOrders(res.data.res);
+      console.log("=====>: ", res);
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 404) {
-          console.error("No pending orders found:", error.response.data.res);
-          setPendingOrders([]);
-        } else {
-          console.error(
-            `Error fetching orders: ${error.response.status} - ${error.response.data.message}`
-          );
-          alert("An error occurred while fetching orders.");
-        }
-      } else {
-        // Handle network or other errors
-        console.error("Error fetching orders:", error.message);
-        alert("Unable to fetch pending orders. Please try again later.");
-      }
+      console.error("Error fetching orders:", error.message);
     }
   };
 
-  const fetchPendingOrderedProducts = async (userId, orderId) => {
-    try {
-      const res = await axios.post(`${apiUrl}/pending_order_products/`, {
-        userId,
-        orderId,
-      });
+  // const fetchPendingOrderedProducts = async (userId, orderId) => {
+  //   try {
+  //     const res = await axios.post(`${apiUrl}/order_products/`, {
+  //       userId,
+  //       orderId,
+  //     });
 
-      if (res.data.status === "success") {
-        console.log("view pending orders: ", res.data.res);
-        setViewPendingOrders(res.data.res);
-      } else {
-        throw new Error("No order products found.");
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
+  //     if (res.data.status === "success") {
+  //       setViewPendingOrders(res.data.res);
+  //     } else {
+  //       throw new Error("No order products found.");
+  //     }
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
 
   useEffect(() => {
-    fetchOrders();
     fetchPendingOrders();
-    fetchPendingOrderedProducts();
-  }, []);
+  }, [orders]);
 
   useEffect(() => {
     // Paginate orders when orders or currentPage change
@@ -111,7 +91,6 @@ function Order() {
       });
 
       if (res.data.status === "success") {
-        alert("Order is preparing.");
         setViewPendingModal(false);
         fetchPendingOrders();
       } else {
@@ -130,7 +109,6 @@ function Order() {
         orderProducts: orderProductsData,
       });
 
-      console.log("Order added successfully:", response.data);
       fetchOrders();
     } catch (error) {
       console.error("Error adding order:", error);
@@ -192,9 +170,13 @@ function Order() {
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Orders</div>
+        <div className="d-flex w-100 justify-content-start">
+          <h4>
+            <strong>Orders</strong>
+          </h4>
+        </div>
         <div className="info">
-          <div className="above-table">
+          {/* <div className="above-table">
             <div className="above-table-wrapper">
               <button className="btn" onClick={() => setAddModalOpen(true)}>
                 <i className="fa-solid fa-add"></i> Add
@@ -302,9 +284,9 @@ function Order() {
                 )}
               </tbody>
             </table>
-          </div>
+          </div> */}
           {/* Pagination Controls */}
-          <div className="pagination">
+          {/* <div className="pagination">
             <button
               className="btn"
               onClick={handlePreviousPage}
@@ -324,7 +306,7 @@ function Order() {
             >
               Next <i className="fa-solid fa-chevron-right"></i>
             </button>
-          </div>
+          </div> */}
 
           <div className="table-list">
             <table className="table">
@@ -341,7 +323,9 @@ function Order() {
               <tbody>
                 {pendingOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6">NO PENDING ORDERS PLACED.</td>
+                    <td colSpan="6">
+                      NO PENDING ORDERS PLACED. PENDING ORDERS IS "0"
+                    </td>
                   </tr>
                 ) : (
                   pendingOrders.map((pendingOrders, index) => (
@@ -382,12 +366,11 @@ function Order() {
                           <button
                             className={` btn btn-primary d-flex align-items-center justify-content-center`}
                             onClick={() => {
-                              openViewPendingOrders(
-                                pendingOrders.customer_id,
-                                pendingOrders.order_id,
-                                pendingOrders.ref_no,
-                                pendingOrders.total_sum_price
-                              );
+                              openViewPendingOrders(pendingOrders.products);
+                              setUserId(pendingOrders.user_id);
+                              setOrderId(pendingOrders.order_id);
+                              setRefNo(pendingOrders.ref_no);
+                              setTotalPrice(pendingOrders.total_sum_price);
                             }}
                           >
                             <i
@@ -405,24 +388,13 @@ function Order() {
           </div>
         </div>
       </div>
-      <AddOrderModal
-        isOpen={isAddModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onAdd={handleAddOrder}
-      />
-      {isEditModalOpen && (
-        <EditOrderModal
-          isOpen={isEditModalOpen}
-          onClose={() => setEditModalOpen(false)}
-          onUpdate={handleUpdateOrder}
-          order={selectedOrder}
-        />
-      )}
 
       {/* VIEW PENDING PRODUCTS OF ORDERS */}
       {viewPendingModal && (
         <div className="modal-overlay">
-          <div className={`modal-content d-flex justify-content-between w-100`}>
+          <div
+            className={`modal-content d-flex justify-content-between w-100`}
+          >
             <div class="modal-header d-flex w-100 justify-content-between">
               <h5>
                 <strong>Ordered Products</strong>

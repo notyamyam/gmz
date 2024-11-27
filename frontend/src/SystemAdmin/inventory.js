@@ -36,6 +36,7 @@ function Inventory() {
       const data = await response.json();
       setItem(data);
       setFilteredItems(data);
+      console.log(data);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -194,12 +195,12 @@ function Inventory() {
             <table>
               <tbody>
                 {filteredItems.map((item, index) => (
-                  <tr key={item.itemId}>
-                    <td>{index + 1}</td>
+                  <tr key={index}>
+                    <td>{item.itemId}</td>
                     <td>{item.itemName}</td>
                     <td>₱{item.price}</td>
                     <td>{item.category}</td>
-                    <td>{item.quantity}</td>
+                    <td>{item.totalQuantity}</td>
                     <td>{item.description}</td>
                     <td>
                       <div className="docubutton">

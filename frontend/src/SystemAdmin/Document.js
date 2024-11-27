@@ -18,12 +18,16 @@ function Document() {
   const [pdfFilePath, setPdfFilePath] = useState(""); // Store the file path of the PDF
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null);
-  const [itemToDelete , setItemToDelete] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState(null);
   // Fetch all documents
   const fetchDocuments = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/documents`);
-      setDocuments(response.data);
+      await axios
+        .get(`${apiUrl}/documents`)
+        .then((res) => {
+          setDocuments(res.data);
+        })
+        .then((err) => console.log(err));
     } catch (error) {
       console.error("Error fetching documents:", error);
     }
@@ -41,16 +45,14 @@ function Document() {
   };
   // Delete a document
   const deleteDocument = async (id) => {
-  
-      try {
-        await axios.delete(`${apiUrl}/documents/${id}`);
-        fetchDocuments();
-        toast.success("Document deleted successfully!");
-      } catch (error) {
-        console.error("Error deleting document:", error);
-        toast.error("Failed to delete document.");
-      }
-    
+    try {
+      await axios.delete(`${apiUrl}/documents/${id}`);
+      fetchDocuments();
+      toast.success("Document deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      toast.error("Failed to delete document.");
+    }
   };
 
   const editDocument = (document) => {
@@ -92,9 +94,10 @@ function Document() {
                 <tr>
                   <th>File Name</th>
                   <th>Category</th>
-                  <th>Date Uploaded</th>
+                  <th>Effective Date</th>
                   <th>Expiration Date</th>
                   <th>Description</th>
+                  <th>Validity</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -103,9 +106,19 @@ function Document() {
                   <tr key={doc.id}>
                     <td>{doc.documentName}</td>
                     <td>{doc.category}</td>
-                    <td>{moment(doc.dateUploaded).format("YYYY-MM-DD")}</td>
-                    <td>{moment(doc.expirationDate).format("YYYY-MM-DD")}</td>
+                    <td>{moment(doc.dateEffective)?.format("YYYY-MM-DD")}</td>
+                    <td>{moment(doc.expirationDate)?.format("YYYY-MM-DD")}</td>
                     <td>{doc.description}</td>
+                    <td
+                      style={{
+                        color:
+                          doc.status === 1 || doc.status === 0
+                            ? "red" 
+                            : "black", 
+                      }}
+                    >
+                      {doc.validity}
+                    </td>
                     <td>
                       <div className="docubutton">
                         <button
@@ -116,7 +129,7 @@ function Document() {
                         </button>
                         <button
                           className="edit-btn"
-                          onClick={() =>{
+                          onClick={() => {
                             setItemToDelete(doc.id);
                             setDeleteModalOpen(true);
                           }}
@@ -147,6 +160,7 @@ function Document() {
       <ViewPDFModal
         isOpen={isViewModalOpen}
         onClose={() => setViewModalOpen(false)}
+        document={currentDocument}
         filePath={pdfFilePath} // Pass the file path to the modal
       />
       <EditDocumentModal
@@ -170,17 +184,14 @@ function Document() {
               >
                 Confirm
               </button>
-              <button
-                className=""
-                onClick={() => setDeleteModalOpen(false)}
-              >
+              <button className="" onClick={() => setDeleteModalOpen(false)}>
                 Cancel
               </button>
             </div>
           </div>
         </div>
       )}
-       <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 }

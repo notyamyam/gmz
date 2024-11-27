@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from "react";
 import "../css/style.css";
-
 import Header from "../BG/Customer/CustomerHeader";
 import Sidebar from "../BG/Customer/CustomerSidebar";
 import axios from "axios";
 import apiUrl from "../ApiUrl/apiUrl";
 import { faVolumeHigh } from "@fortawesome/free-solid-svg-icons";
-import style from "./Orders.module.css";
+import style from "./Preparing.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-function Orders() {
+function Preparing() {
   const [showAddToCart, setAddToCart] = useState(false);
   const [showMyCart, setMyCart] = useState(false);
 
@@ -121,11 +120,11 @@ function Orders() {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchPreparing = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/orders_customer/${userId}`);
+      const res = await axios.get(`${apiUrl}/orders_preparing/${userId}`);
       if (res.data.status === "success") {
-        console.log("ORDER: ", res.data.res);
+        console.log("PREPARING ORDERS: ", res.data.res);
         setOrderProd(res.data.res);
       } else {
         throw new Error("No orders found.");
@@ -169,7 +168,7 @@ function Orders() {
 
   useEffect(() => {
     fetchCustomerName();
-    fetchOrders();
+    fetchPreparing();
     fetchItems();
     fetchMyCart();
     fetchOrderedProducts();
@@ -306,7 +305,7 @@ function Orders() {
         setCartItems([]);
         setShowMOP(false);
         setMyCart(false);
-        fetchOrders();
+        fetchPreparing();
       }
     } catch (error) {
       console.log(error);
@@ -319,7 +318,7 @@ function Orders() {
       const res = await axios.post(`${apiUrl}/cancelled_order`, { orderId });
       if (res.status === 200) {
         toast.success("Order cancelled successfully.");
-        fetchOrders();
+        fetchPreparing();
         closeCancelModal();
       }
     } catch (error) {
@@ -356,23 +355,10 @@ function Orders() {
         <div className="d-flex w-100 justify-content-between p-2">
           <div className="d-flex w-100 justify-content-start">
             <h5>
-              <strong>Orders</strong>
+              <strong>Preparing</strong>
             </h5>
           </div>
-          <div className="d-flex w-100 justify-content-end align-items-center gap-2">
-            <button
-              className={`${style.btnTopButton} btn d-flex align-items-center justify-content-center`}
-              onClick={openAddToCartModal}
-            >
-              <i className="fa-solid fa-add"></i>
-            </button>
-            <button
-              className={`${style.btnTopButton} btn d-flex align-items-center justify-content-center`}
-              onClick={openViewMyCart}
-            >
-              <i class="fa fa-shopping-cart"></i>
-            </button>
-          </div>
+         
         </div>
 
         <div className="table-list">
@@ -837,4 +823,4 @@ function Orders() {
   );
 }
 
-export default Orders;
+export default Preparing;

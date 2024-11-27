@@ -157,7 +157,7 @@ function RawMats() {
             <table className="table-head">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th onClick={() => handleSort("matId")}>#</th>
                   <th onClick={() => handleSort("matName")}>Item Name</th>
                   <th>Quantity</th>
                   <th onClick={() => handleSort("category")}>Category</th>
@@ -170,8 +170,8 @@ function RawMats() {
             <table>
               <tbody>
                 {sortedData.map((rawMats, index) => (
-                  <tr key={rawMats.matsId}>
-                    <td>{index + 1}</td>
+                  <tr key={index}>
+                    <td>{rawMats.matId}</td>
                     <td>{rawMats.matName}</td>
                     <td>{rawMats.total_remaining_quantity}</td>
                     <td>{rawMats.category}</td>

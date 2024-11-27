@@ -20,9 +20,8 @@ function Inventory() {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/products`);
+      const response = await axios.get(`${apiUrl}/item`);
 
-    
       console.log(response);
       setItem(response.data);
       setSortedItems(response.data); // Initially set the sortedItems to all items
@@ -138,8 +137,8 @@ function Inventory() {
             <table>
               <tbody>
                 {filteredItems.map((item, index) => (
-                  <tr key={item.itemId}>
-                    <td>{index + 1}</td>
+                  <tr key={index}>
+                    <td>{item.itemId}</td>
                     <td>{item.itemName}</td>
                     <td>₱{item.price}</td>
                     <td>{item.category}</td>

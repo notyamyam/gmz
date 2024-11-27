@@ -1,0 +1,6 @@
+.badge-preparing {
+    background-color: #000; /* Yellow for pending */
+    color: white;
+    padding: 0.3rem;
+    border-radius: 5px;
+  }

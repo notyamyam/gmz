@@ -2,9 +2,9 @@
 import React from "react";
 import "../css/style.css"; // Add styles for modal if necessary
 
-const ViewPDFModal = ({ isOpen, onClose, filePath }) => {
+const ViewPDFModal = ({ isOpen, onClose, document ,filePath }) => {
   if (!isOpen) return null;
-
+  console.log(">>",document);
   return (
     <div className="modal-overlay">
       <div className="modal-pdf">

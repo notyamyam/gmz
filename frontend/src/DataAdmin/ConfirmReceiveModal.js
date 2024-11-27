@@ -9,7 +9,8 @@ const ConfirmReceiveModal = ({ isOpen, onClose, onConfirm, item }) => {
     if (receivedQuantity && receivedQuantity > 0 && receivedQuantity <= item.quantity) {
       onConfirm(item, receivedQuantity);
       setReceivedQuantity("");
-      setError(""); // Reset error
+      setError("");
+      onClose();
     } else {
       setError("Please enter a valid quantity between 1 and the ordered quantity.");
     }

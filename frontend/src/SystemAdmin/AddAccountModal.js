@@ -5,6 +5,11 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [credentials, setCredentials] = useState({
+    customer_id: "",
+    name: "",
+    location: "",
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,6 +23,7 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
       username,
       password,
       access: role, // Role corresponds to `access` in your main component
+      ...(role == "4" && credentials), // Include customer data only if role is "Customer"
     };
 
     onAdd(newAccount); // Call the `onAdd` function passed as a prop
@@ -25,6 +31,7 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
     setUsername("");
     setPassword("");
     setRole("");
+    setCredentials({ customer_id: "", name: "", location: "" }); // Reset credentials
   };
 
   if (!isOpen) return null;
@@ -62,6 +69,31 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
               <option value="3">System Sales</option>
               <option value="4">Customer</option>
             </select>
+            {role === "4" && (
+              <>
+             
+                <label>Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={credentials.name}
+                  onChange={(e) =>
+                    setCredentials({ ...credentials, name: e.target.value })
+                  }
+                  required
+                />
+                <label>Location</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={credentials.location}
+                  onChange={(e) =>
+                    setCredentials({ ...credentials, location: e.target.value })
+                  }
+                  required
+                />
+              </>
+            )}
           </div>
           <div className="modal-buttons">
             <button type="submit">Add Account</button>

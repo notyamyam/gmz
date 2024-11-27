@@ -7,21 +7,27 @@ import moment from "moment";
 import EditOrderModal from "./EditOrderModal";
 import apiUrl from "../ApiUrl/apiUrl";
 
-// toast
+//toast
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-function PreparingOrders() {
+function PreparedOrders() {
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]); // New state to hold items
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   //modal viewing of products per order
-  const [viewPreparingModal, setViewPreparingModal] = useState(false);
+  const [viewPreparingModal, setViewPreparedModal] = useState(false);
 
-  const [preparingOrders, setPreparingOrders] = useState([]);
-  const [viewPreparingOrders, setViewPreparingOrders] = useState([]);
+  //modal for choosing vehicle
+  const [chooseVehicle, setChooseVehicle] = useState(false);
+  const [vehicle, setVehicle] = useState([]); //array for tblvehicle
+  const [selectedType, setSelectedType] = useState(""); // Selected vehicle type
+  const [availableVehicles, setAvailableVehicles] = useState([]); // Array for filtered vehicles that is available.
+
+  const [preparedOrders, setPreparedOrders] = useState([]);
+  const [viewPreparedOrders, setViewPreparedOrders] = useState([]);
 
   const [userId, setUserId] = useState("");
   const [orderId, setOrderId] = useState("");
@@ -29,24 +35,24 @@ function PreparingOrders() {
   const [refNo, setRefNo] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
 
-  const openViewPreparingOrders = (data) => {
-    setViewPreparingModal(true);
-    setViewPreparingOrders(data);
+  const openViewPreparedOrders = (data) => {
+    setViewPreparedModal(true);
+    setViewPreparedOrders(data);
   };
 
-  const closeViewPreparingOrders = () => {
-    setViewPreparingModal(false);
+  const closeViewPreparedOrders = () => {
+    setViewPreparedModal(false);
   };
 
   // Fetch orders preparing from the backend
-  const fetchPreparing = async () => {
+  const fetchPrepared = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/preparing_Orders`);
+      const res = await axios.get(`${apiUrl}/prepared_Orders`);
       console.log(res);
 
       if (res.data.status === "success") {
         console.log("PREPARING ORDERS: ", res.data.res);
-        setPreparingOrders(res.data.res);
+        setPreparedOrders(res.data.res);
       } else {
         throw new Error("No orders found.");
       }
@@ -55,45 +61,92 @@ function PreparingOrders() {
     }
   };
 
-  // const fetchPreparingOrderedProducts = async (userId, orderId) => {
-  //   try {
-  //     const res = await axios.post(`${apiUrl}/order_products/`, {
-  //       userId,
-  //       orderId,
-  //     });
-
-  //     if (res.data.status === "success") {
-  //       console.log("view pending orders: ", res.data.res);
-  //       setViewPreparingOrders(res.data.res);
-  //     } else {
-  //       throw new Error("No order products found.");
-  //     }
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
-  // };
-
-  // Fetch items from the backend
+  const fetchVehicle = async () => {
+    try {
+      const res = await axios.get(`${apiUrl}/vehicle`);
+      console.log("fetched vehicle: ", res.data.res);
+      setVehicle(res.data.res);
+    } catch (error) {
+      console.log("ERROR: ", error);
+    }
+  };
 
   useEffect(() => {
-    fetchPreparing();
+    fetchPrepared();
+    fetchVehicle();
   }, []);
 
-  const handlePrepared = async (orderId) => {
+  const handleUpdateOrder = async (updatedOrder) => {
     try {
-      const res = await axios.post(`${apiUrl}/status_prepared/`, {
+      await axios.put(`${apiUrl}/orders/${updatedOrder.orderId}`, updatedOrder);
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order.orderId === updatedOrder.orderId ? updatedOrder : order
+        )
+      );
+      setEditModalOpen(false);
+      fetchPrepared();
+    } catch (error) {
+      console.error("Error updating order:", error);
+    }
+  };
+
+  // Function to get item name by itemI
+
+  const handleVehicleTypeChange = async (e) => {
+    const type = e.target.value;
+    setSelectedType(type);
+
+    if (type) {
+      try {
+        const res = await axios.post(`${apiUrl}/avail_vehicles`, {
+          type: type,
+        });
+        console.log("===>", res);
+        setAvailableVehicles(res.data.res);
+      } catch (error) {
+        console.error("Error fetching available vehicles: ", error);
+      }
+    }
+  };
+
+  const handleStatusReady = async (orderId) => {
+    try {
+      const res = await axios.post(`${apiUrl}/status_ready/`, {
         orderId,
+        selectedVehicle,
       });
 
       if (res.data.status === "success") {
-        toast.success("Proceed to prepared, to assign rider.");
-        setViewPreparingModal(false);
-        fetchPreparing();
+        toast.success("Deliver it on Ready to go!");
+
+        setChooseVehicle(false);
+        closeViewPreparedOrders();
       } else {
         throw new Error("No order products found.");
       }
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+
+  // Handle change event when a user selects a vehicle
+  const handleGetSelectedPlate = (event) => {
+    const selectedPlate = event.target.value; // This is the selected vehicle's vehicle_plate
+    setSelectedVehicleId(selectedPlate); // Update the selected vehicle plate
+
+    // Find the vehicle object that matches the selected vehicle_plate
+    const vehicle = availableVehicles.find(
+      (v) => v.vehicle_plate === selectedPlate
+    ); // Compare with v.vehicle_plate
+
+    if (vehicle) {
+      console.log("ORDER ID:", orderId);
+      console.log("Selected Vehicle Plate:", vehicle.vehicle_plate); // Log the vehicle plate
+      setSelectedVehicle(vehicle.vehicle_plate); // Store the selected vehicle details
     }
   };
 
@@ -104,7 +157,7 @@ function PreparingOrders() {
       <div className="main-content">
         <div className="d-flex w-100 justify-content-start">
           <h4>
-            <strong>Preparing Orders</strong>
+            <strong>Prepared Orders and Assigning Riders</strong>
           </h4>
         </div>
         <div className="info">
@@ -167,42 +220,44 @@ function PreparingOrders() {
                 </tr>
               </thead>
               <tbody>
-                {preparingOrders?.length === 0 ? (
+                {preparedOrders?.length === 0 ? (
                   <tr>
-                    <td colSpan="6">NO PENDING ORDERS PLACED.</td>
+                    <td colSpan="6">
+                      NO <strong>PREPARED</strong> ORDERS PLACED.
+                    </td>
                   </tr>
                 ) : (
-                  preparingOrders?.map((preparingOrders, index) => (
+                  preparedOrders?.map((preparedOrders, index) => (
                     <tr key={index}>
                       <td className="text-start align-middle ">
-                        <span className="me-2">{preparingOrders.order_id}</span>
+                        <span className="me-2">{preparedOrders.order_id}</span>
                         <strong className="me-2">
-                          <i>{preparingOrders.mop}</i>
+                          <i>{preparedOrders.mop}</i>
                         </strong>
                         <strong className="me-2">
-                          <i>{preparingOrders.status}</i>
+                          <i>{preparedOrders.status}</i>
                         </strong>
                         <strong>
-                          <i>{preparingOrders.ref_no}</i>
+                          <i>{preparedOrders.ref_no}</i>
                         </strong>
                       </td>
                       <td className="text-start align-middle ">
                         <span className="me-2">
-                          {preparingOrders.customer_name}
+                          {preparedOrders.customer_name}
                         </span>
                       </td>
                       <td className="text-start align-middle">
-                        {preparingOrders.customer_loc}
+                        {preparedOrders.customer_loc}
                       </td>
                       <td className="text-start align-middle">
-                        {preparingOrders.date}
+                        {preparedOrders.date}
                       </td>
 
                       <td className="text-start align-middle">
                         {new Intl.NumberFormat("en-PH", {
                           style: "currency",
                           currency: "PHP",
-                        }).format(preparingOrders.total_sum_price)}
+                        }).format(preparedOrders.total_sum_price)}
                       </td>
 
                       <td className="align-middle">
@@ -210,11 +265,11 @@ function PreparingOrders() {
                           <button
                             className={` btn btn-primary d-flex align-items-center justify-content-center`}
                             onClick={() => {
-                              openViewPreparingOrders(preparingOrders.products);
-                              setUserId(preparingOrders.user_id);
-                              setOrderId(preparingOrders.order_id);
-                              setRefNo(preparingOrders.ref_no);
-                              setTotalPrice(preparingOrders.total_sum_price);
+                              openViewPreparedOrders(preparedOrders.products);
+                              setUserId(preparedOrders.userId);
+                              setOrderId(preparedOrders.order_id);
+                              setRefNo(preparedOrders.ref_no);
+                              setTotalPrice(preparedOrders.total_price);
                             }}
                           >
                             <i
@@ -230,9 +285,18 @@ function PreparingOrders() {
               </tbody>
             </table>
           </div>
+
         </div>
       </div>
-      {/* VIEW PENDING PRODUCTS OF ORDERS */}
+      {isEditModalOpen && (
+        <EditOrderModal
+          isOpen={isEditModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          onUpdate={handleUpdateOrder}
+          order={selectedOrder}
+        />
+      )}
+      {/* VIEW PRODUCTS OF ORDERS */}
       {viewPreparingModal && (
         <div className="modal-overlay">
           <div className={`modal-content d-flex justify-content-between w-100`}>
@@ -243,7 +307,7 @@ function PreparingOrders() {
               <button
                 type="button"
                 className="btn-close bg-light"
-                onClick={closeViewPreparingOrders}
+                onClick={closeViewPreparedOrders}
               ></button>
             </div>
             <div className="d-flex w-100 justify-content-between mt-2">
@@ -272,12 +336,12 @@ function PreparingOrders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {viewPreparingOrders?.length === 0 ? (
+                    {viewPreparedOrders?.length === 0 ? (
                       <tr>
                         <td colSpan="6">NO PRODUCTS FOUND.</td>
                       </tr>
                     ) : (
-                      viewPreparingOrders?.map((item, index) => (
+                      viewPreparedOrders?.map((item, index) => (
                         <tr key={index}>
                           <td className="w-25 text-start align-middle">
                             {item.item_name}
@@ -308,14 +372,75 @@ function PreparingOrders() {
                   <button
                     className="btn btn-success"
                     onClick={() => {
-                      handlePrepared(orderId);
+                      setChooseVehicle(true);
                     }}
                   >
-                    <i className="fa fa-check "></i>
-                    <span className="ms-1">Mark as Prepared </span>
+                    <i className="fa fa-truck "></i>
+                    <span className="ms-1">Assign a Courier</span>
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal for choosing vehicle */}
+      {chooseVehicle && (
+        <div className="modal-overlay">
+          <div className={`modal-content d-flex justify-content-between w-50`}>
+            <div class="modal-header d-flex w-100 justify-content-between">
+              <h5>
+                <strong>Available Vehicle</strong>
+              </h5>
+              <button
+                type="button"
+                className="btn-close bg-light"
+                onClick={() => {
+                  setChooseVehicle(false);
+                  setAvailableVehicles([]);
+                }}
+              ></button>
+            </div>
+
+            <div className="d-flex w-100 flex-column gap-1">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleStatusReady(orderId);
+                }}
+              >
+                <div>
+                  <span>Vehicle Type:</span>
+                  <select required onChange={handleVehicleTypeChange}>
+                    <option value="">-- Select a Vehicle --</option>
+                    {vehicle.map((v) => (
+                      <option key={v.plate} value={v.vehicle_type}>
+                        {v.vehicle_type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span>Choose vehicle:</span>
+                  <select
+                    required
+                    disabled={!selectedType}
+                    onChange={handleGetSelectedPlate}
+                    value={selectedVehicleId}
+                  >
+                    <option value="">-- Select a Vehicle --</option>
+                    {availableVehicles?.map((v) => (
+                      <option key={v.vehicle_plate} value={v.vehicle_plate}>
+                        {v.vehicle_plate} - ({v.rider})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="d-flex w-100 justify-content-end">
+                  <button className="btn btn-primary">Confirm</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -325,4 +450,4 @@ function PreparingOrders() {
   );
 }
 
-export default PreparingOrders;
+export default PreparedOrders;

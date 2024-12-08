@@ -30,6 +30,10 @@ function SupplyDeliveries() {
   const [viewPrice, setViewPrice] = useState(0);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Adjust the items per page as needed
   const fetchData = async () => {
     try {
       await axios
@@ -103,7 +107,6 @@ function SupplyDeliveries() {
       fetchData();
       setIsConfirmModalOpen(false);
       setIsView(false);
-      
     } catch (error) {
       console.error("Error updating item or order status:", error);
       toast.error("Failed to update item.");
@@ -148,6 +151,7 @@ function SupplyDeliveries() {
   };
 
   const openUpdateModal = (items) => {
+    console.log("items>", items);
     setSelectedPurchase(items);
     setSelectedDeliveryId(items.supDeliIds);
     setUpdateModalOpen(true);
@@ -171,13 +175,29 @@ function SupplyDeliveries() {
         getSupply(delivery.supplyId)
           ?.toLowerCase()
           .includes(query.toLowerCase()) ||
-        delivery.matName?.toLowerCase().includes(query.toLowerCase())
+        delivery.matName?.toLowerCase().includes(query.toLowerCase()) ||
+        delivery.totalQuantity
+          ?.toString()
+          .toLowerCase()
+          .includes(query.toLowerCase()) ||
+        delivery.totalCost
+          ?.toString()
+          .toLowerCase()
+          .includes(query.toLowerCase())
     );
   };
 
+  const totalPages = Math.ceil(supDeli.length / itemsPerPage);
+  const currentData = supDeli.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   useEffect(() => {
     fetchData();
-  }, [supDeli]);
+  }, []);
 
   useEffect(() => {
     if (searchQuery) {
@@ -186,14 +206,18 @@ function SupplyDeliveries() {
     } else {
       fetchData();
     }
-  }, [searchQuery]);
+  }, [supDeli, searchQuery]);
 
   return (
     <div className="container1">
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Supply Deliveries</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Supply Deliveries</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
@@ -211,14 +235,17 @@ function SupplyDeliveries() {
                   className="search-input"
                   placeholder="Search by Supplier or Item..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setSearchQuery(e.target.value);
+                  }}
                   size="40"
                 />
               </div>
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
                   <th onClick={() => sortData("supplyId")}>#</th>
@@ -231,18 +258,19 @@ function SupplyDeliveries() {
                   <th>Actions</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
               <tbody>
-                {supDeli?.map((delivery, index) => (
+                {currentData?.map((delivery, index) => (
                   <tr key={index}>
                     <td>{delivery.orderId}</td>
                     <td>{delivery.supplyName}</td>
 
                     <td>{delivery.totalQuantity}</td>
-                    <td>₱{delivery.totalCost}</td>
+                    <td>
+                      {new Intl.NumberFormat("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      }).format(delivery.totalCost)}
+                    </td>
                     <td>
                       <span
                         className={`badge ${
@@ -266,6 +294,7 @@ function SupplyDeliveries() {
                       <div className="docubutton">
                         <button
                           className="done-btn"
+                          style={{ backgroundColor: "red" }}
                           onClick={() => {
                             setOrderedItems(delivery.productDetails);
                             setViewPrice(delivery.totalCost);
@@ -293,6 +322,24 @@ function SupplyDeliveries() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -325,9 +372,17 @@ function SupplyDeliveries() {
           <div className="modal-content">
             <div className="isViewModalHeader">
               {" "}
-              <h2>Items Ordered</h2>
+              <h2 style={{ color: "gray" }}>
+                {" "}
+                <strong>Items Ordered</strong>
+              </h2>
               <h2>
-                Total: {viewPrice?.toFixed(2) ? viewPrice?.toFixed(2) : 0}
+                <strong>Total: </strong>
+
+                {new Intl.NumberFormat("en-PH", {
+                  style: "currency",
+                  currency: "PHP",
+                }).format(viewPrice || 0)}
               </h2>
             </div>
             <table>
@@ -336,7 +391,8 @@ function SupplyDeliveries() {
                   <th>#</th>
                   <th>Material Name</th>
                   <th>Price</th>
-                  <th> Quantity </th>
+                  <th> Ordered (qty) </th>
+                  <th> Received (qty) </th>
                   <th> Status </th>
                   <th> Total Cost </th>
                   <th> Action </th>
@@ -348,8 +404,14 @@ function SupplyDeliveries() {
                     <tr key={index + 1}>
                       <td>{index + 1}</td>
                       <td>{order.matName}</td>
-                      <td>₱{order.price}</td>
+                      <td>
+                        {new Intl.NumberFormat("en-PH", {
+                          style: "currency",
+                          currency: "PHP",
+                        }).format(order.price)}
+                      </td>
                       <td>{order.quantity}</td>
+                      <td>{order.quantity_received}</td>
                       <td>
                         {" "}
                         <span
@@ -368,7 +430,12 @@ function SupplyDeliveries() {
                             : "Pending"}
                         </span>
                       </td>
-                      <td>₱{order.itemTotal}</td>
+                      <td>
+                        {new Intl.NumberFormat("en-PH", {
+                          style: "currency",
+                          currency: "PHP",
+                        }).format(order.itemTotal)}
+                      </td>
                       <td>
                         {" "}
                         <div className="docubutton">

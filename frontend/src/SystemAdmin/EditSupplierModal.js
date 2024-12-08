@@ -98,7 +98,9 @@ function EditSupplierModal({ isOpen, onClose, supplier, onUpdate }) {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Edit Supplier</h2>
+        <h2 style={{ color: "gray" }}>
+          <strong>Edit Supplier</strong>
+        </h2>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -132,7 +134,12 @@ function EditSupplierModal({ isOpen, onClose, supplier, onUpdate }) {
               type="number"
               placeholder="Price"
               value={selectedPrice}
-              onChange={(e) => setSelectedPrice(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (newValue >= 0 || newValue === "") {
+                  setSelectedPrice(newValue);
+                }
+              }}
             />
             <button type="button" onClick={addProductToSupplier}>
               Add Product
@@ -155,7 +162,7 @@ function EditSupplierModal({ isOpen, onClose, supplier, onUpdate }) {
                   );
                   return (
                     <li key={index}>
-                      {product ? product.matName : "Unknown Product"} - $
+                      {product ? product.matName : "Unknown Product"} - ₱
                       <input
                         type="number"
                         value={price}
@@ -178,10 +185,13 @@ function EditSupplierModal({ isOpen, onClose, supplier, onUpdate }) {
             )}
           </div>
 
-          <button type="submit">Update Supplier</button>
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
+          <div className="d-flex flex-column gap-2">
+            {" "}
+            <button type="submit">Update Supplier</button>
+            <button type="button" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
         </form>
       </div>
     </div>

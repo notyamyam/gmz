@@ -24,7 +24,6 @@ app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 const os = require("os");
 
-// Get the machine's network interfaces (optional, for more dynamic IP resolution)
 const networkInterfaces = os.networkInterfaces();
 const localIP =
   Object.values(networkInterfaces)
@@ -46,12 +45,20 @@ const localIP =
 //   database: "dbgmz",
 // });
 
+// const db = mysql.createPool({
+//   host: "srv1154.hstgr.io",
+//   user: "u319302750_dbgmzadmin",
+//   password: "Dbgmzadmin112024!",
+//   database: "u319302750_dbgmz",
+//   connectionLimit: 50,
+// });
+
 const db = mysql.createPool({
-  host: "srv1154.hstgr.io",
-  user: "u319302750_dbgmzadmin",
-  password: "Dbgmzadmin112024!",
-  database: "u319302750_dbgmz",
-  connectionLimit: 10,
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "dbgmz",
+  connectionLimit: 50,
 });
 
 db.getConnection((err, connection) => {
@@ -218,11 +225,12 @@ app.post("/api/register", async (req, res) => {
 // GET all accounts with customer info if access = 4
 app.get("/api/accounts", async (req, res) => {
   const sql = `
-    SELECT 
-      u.id, u.username, u.password, u.access, 
-      c.name AS customer_name, c.location AS customer_location
-    FROM tblusers u
-    LEFT JOIN tblcustomer c ON u.id = c.customer_id`;
+      SELECT 
+        u.id, u.username, u.password, u.access, 
+        c.name AS customer_name, c.location AS customer_location
+      FROM tblusers u
+      LEFT JOIN tblcustomer c ON u.id = c.customer_id
+      ORDER BY u.access , u.id ASC;`;
 
   try {
     const results = await queryAsync(sql);
@@ -389,7 +397,7 @@ app.post("/api/documents/upload", upload.single("documentFile"), (req, res) => {
 
   try {
     const sql =
-      "INSERT INTO tbldocument (documentName, filePath, category, dateEffective, dateUploaded, expirationDate, description) VALUES (?, ?, ?, ?, ?,?, ?)";
+      "INSERT INTO tbldocument (documentName, filePath, category, dateEffective, dateUploaded, expirationDate, description, isArchive) VALUES (?, ?, ?, ?, ?,?, ?, ?)";
     db.query(
       sql,
       [
@@ -400,6 +408,7 @@ app.post("/api/documents/upload", upload.single("documentFile"), (req, res) => {
         dateEffective,
         expirationDate,
         description,
+        0,
       ],
       (err, result) => {
         if (err) {
@@ -434,26 +443,27 @@ app.use((err, req, res, next) => {
 
 app.get("/api/documents", (req, res) => {
   const sql = `  
- SELECT 
-    d.*, 
-    -- Validity Column: How many months left or expired
-    CASE 
-        WHEN d.expirationDate IS NULL THEN 'No Expiration Date'
-        WHEN d.expirationDate < CURDATE() THEN 'Expired'
-        WHEN TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate) <= 3 THEN CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
-        ELSE CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
-    END AS validity,
-    
-    -- Status Column: 1 = Renew Now, 0 = Expired, 2 = More than 3 months left
-    CASE 
-        WHEN d.expirationDate IS NULL THEN NULL
-        WHEN d.expirationDate < CURDATE() THEN 0   -- Expired
-        WHEN TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate) <= 3 THEN 1  -- Renew Now
-        ELSE 2  -- More than 3 months left
-    END AS status
-FROM tbldocument d;
+  SELECT 
+      d.*, 
+      -- Validity Column: How many months left or expired
+      CASE 
+          WHEN d.expirationDate IS NULL THEN 'No Expiration Date'
+          WHEN d.expirationDate < CURDATE() THEN 'Expired'
+          WHEN TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate) <= 3 THEN CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
+          ELSE CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
+      END AS validity,
+      
+      -- Status Column: 1 = Renew Now, 0 = Expired, 2 = More than 3 months left
+      CASE 
+          WHEN d.expirationDate IS NULL THEN NULL
+          WHEN d.expirationDate < CURDATE() THEN 0   -- Expired
+          WHEN TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate) <= 3 THEN 1  -- Renew Now
+          ELSE 2  -- More than 3 months left
+      END AS status
+  FROM tbldocument d
+  ORDER BY d.expirationDate ASC;
 
-`;
+  `;
   db.query(sql, (err, results) => {
     if (err) {
       return res.status(500).json({
@@ -504,10 +514,10 @@ app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
 
     // Update the database with new values
     const updateQuery = `
-      UPDATE tbldocument
-      SET documentName = ?, category = ?, dateEffective = ? ,expirationDate = ?, description = ?
-      ${newFilePath ? ", filePath = ?" : ""}
-      WHERE id = ?`;
+        UPDATE tbldocument
+        SET documentName = ?, category = ?, dateEffective = ? ,expirationDate = ?, description = ?
+        ${newFilePath ? ", filePath = ?" : ""}
+        WHERE id = ?`;
 
     const queryParams = newFilePath
       ? [
@@ -562,8 +572,8 @@ app.put("/api/documents/:id", upload.single("documentFile"), (req, res) => {
   });
 });
 
-app.delete("/api/documents/:id", (req, res) => {
-  const { id } = req.params;
+app.delete("/api/documents/:id/:documentName/:user", (req, res) => {
+  const { id, documentName, user } = req.params;
 
   let newFilePath = null;
 
@@ -573,7 +583,7 @@ app.delete("/api/documents/:id", (req, res) => {
   }
 
   // Query to get the current file path
-  const getFileQuery = `SELECT filePath FROM tbldocument WHERE id = ?`;
+  const getFileQuery = `SELECT documentName, filePath FROM tbldocument WHERE id = ?`;
 
   db.query(getFileQuery, [id], (err, rows) => {
     if (err) {
@@ -587,7 +597,7 @@ app.delete("/api/documents/:id", (req, res) => {
 
     // Update the database with new values
     const deleteQuery = `
-      DELETE FROM tbldocument WHERE id = ${id}`;
+        DELETE FROM tbldocument WHERE id = ${id}`;
 
     db.query(deleteQuery, (err, result) => {
       if (err) {
@@ -614,9 +624,55 @@ app.delete("/api/documents/:id", (req, res) => {
         });
       }
 
+      const sqlnotif = `INSERT INTO tblnotifications (description, status) VALUES ('${documentName} has been deleted by ${user}.',0)`;
+
+      db.query(sqlnotif, id, (err, result) => {
+        if (err) {
+          console.error("Error archiving:", err);
+          return res.status(500).send("Error archiving document");
+        }
+      });
+
       return res.status(200).json({ message: "Document delete successfully." });
     });
   });
+});
+
+app.put("/api/documents/:id/archive", async (req, res) => {
+  const { id } = req.params;
+  const { documentName, user, isArchive, status, archiveValue } = req.body;
+  console.log(req.body);
+  try {
+    // Find the document by ID
+
+    if (!id) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    const sql = `UPDATE tbldocument SET isArchive = ${archiveValue} WHERE id = ?`;
+
+    db.query(sql, id, (err, result) => {
+      if (err) {
+        console.error("Error archiving:", err);
+        return res.status(500).send("Error archiving document");
+      }
+      var sqlnotif = `INSERT INTO tblnotifications (description, status) VALUES ('${documentName} has been archived by ${user}.',0)`;
+      if (archiveValue == 0) {
+        sqlnotif = `INSERT INTO tblnotifications (description, status) VALUES ('${documentName} has been unarchived by ${user}.',0)`;
+      }
+
+      db.query(sqlnotif, id, (err, result) => {
+        if (err) {
+          console.error("Error archiving:", err);
+          return res.status(500).send("Error archiving document");
+        }
+      });
+    });
+    return res.status(200).json({ message: "Document archived successfully" });
+  } catch (error) {
+    console.error("Error archiving document:", error);
+    res.status(500).json({ message: "Failed to archive document" });
+  }
 });
 // app.get("/api/documents/notifications", (req, res) => {
 //   const currentDate = moment().format("YYYY-MM-DD");
@@ -625,10 +681,10 @@ app.delete("/api/documents/:id", (req, res) => {
 
 //   // Modify the query as required
 //   const query = `
-//     SELECT d.* 
+//     SELECT d.*
 //     FROM tbldocument d
 //     JOIN tblcategories c ON d.category = c.categoryName
-//     WHERE 
+//     WHERE
 //       -- Notify legal documents within 1 year of expiration
 //       (c.type = 'Legal' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
 //       OR
@@ -657,19 +713,19 @@ app.get("/api/documents/notifications", (req, res) => {
 
   // Modify the query as required
   const query = `
-    SELECT d.*, c.type AS categoryType
-    FROM tbldocument d
-    JOIN tblcategories c ON d.category = c.categoryName
-    WHERE 
-      -- Notify legal documents within 1 year of expiration
-      (c.type = 'Legal' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
-      OR
-      -- Notify contracts/agreements 3 months before renewal
-      (c.type = 'Contracts/Agreement' AND d.expirationDate BETWEEN '${currentDate}' AND '${threeMonthsFromNow}')
-      OR
-      -- Notify regular documents expiring in 1 year
-      (c.type = 'Document' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
-  `;
+      SELECT d.*, c.type AS categoryType
+      FROM tbldocument d
+      JOIN tblcategories c ON d.category = c.categoryName
+      WHERE 
+        -- Notify legal documents within 1 year of expiration
+        (c.type = 'Legal' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
+        OR
+        -- Notify contracts/agreements 3 months before renewal
+        (c.type = 'Contracts/Agreement' AND d.expirationDate BETWEEN '${currentDate}' AND '${threeMonthsFromNow}')
+        OR
+        -- Notify regular documents expiring in 1 year
+        (c.type = 'Document' AND d.expirationDate BETWEEN '${currentDate}' AND '${oneYearFromNow}')
+    `;
 
   db.query(query, (err, results) => {
     if (err) {
@@ -685,16 +741,24 @@ app.get("/api/documents/notifications", (req, res) => {
       const checkQuery = `SELECT * FROM tblnotifications WHERE description = ?`;
       db.query(checkQuery, [description], (checkErr, checkResults) => {
         if (checkErr) {
-          console.error("Error checking for duplicate notifications:", checkErr);
+          console.error(
+            "Error checking for duplicate notifications:",
+            checkErr
+          );
         }
 
         if (checkResults.length === 0) {
           // No duplicate found, insert the new notification
           const insertQuery = `
-            INSERT INTO tblnotifications (description, status)
-            VALUES (?, ?)
-          `;
-          const status = notif.status === 1 ? 'Renew Now' : (notif.status === 0 ? 'Expired' : 'More than 3 months left');
+              INSERT INTO tblnotifications (description, status)
+              VALUES (?, ?)
+            `;
+          const status =
+            notif.status === 1
+              ? "Renew Now"
+              : notif.status === 0
+              ? "Expired"
+              : "More than 3 months left";
           db.query(insertQuery, [description, status], (insertErr) => {
             if (insertErr) {
               console.error("Error inserting notification:", insertErr);
@@ -711,23 +775,22 @@ app.get("/api/documents/notifications", (req, res) => {
 // Function to generate a detailed notification description
 function generateNotificationDescription(notif) {
   const expirationDate = moment(notif.expirationDate).format("YYYY-MM-DD");
-  if (notif.categoryType === 'Legal') {
+  if (notif.categoryType === "Legal") {
     return `${notif.documentName} (Legal) is expiring soon on ${expirationDate}.`;
-  } else if (notif.categoryType === 'Contracts/Agreement') {
+  } else if (notif.categoryType === "Contracts/Agreement") {
     return `${notif.documentName} (Contract/Agreement) needs renewal by ${expirationDate}.`;
   } else {
     return `${notif.documentName} (Document) will expire on ${expirationDate}.`;
   }
 }
 
-
 app.get("/api/documents/getnotifications", (req, res) => {
   const query = `
-    SELECT * FROM tblnotifications
-    ORDER BY status ASC
-    LIMIT 10;
-  `;
-  
+      SELECT * FROM tblnotifications
+      ORDER BY id DESC
+      LIMIT 10;
+    `;
+
   db.query(query, (err, results) => {
     if (err) {
       console.error("Error fetching notifications:", err);
@@ -738,23 +801,23 @@ app.get("/api/documents/getnotifications", (req, res) => {
   });
 });
 
-
 app.post("/api/documents/mark-as-read", (req, res) => {
   const { id } = req.body;
 
   // Update the status of the notification to 1 (read)
   const query = `UPDATE tblnotifications SET status = 1 WHERE id = ?`;
-  
+
   db.query(query, [id], (err, result) => {
     if (err) {
       console.error("Error marking notification as read:", err);
-      return res.status(500).json({ error: "Failed to update notification status." });
+      return res
+        .status(500)
+        .json({ error: "Failed to update notification status." });
     }
 
     return res.status(200).json({ message: "Notification marked as read." });
   });
 });
-
 
 app.get("/api/customer-orders", (req, res) => {
   const query =
@@ -799,97 +862,157 @@ app.get("/api/documentsdashboard", (req, res) => {
   });
 });
 
-app.get("/api/itemdashboard", (req, res) => {
-  const sql = `
-    SELECT it.ItemName,  it.quantity as Remaining, COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity 
-    FROM tblitems it 
-    LEFT JOIN tblproduction p ON it.itemId = p.itemId 
-    GROUP BY it.itemId 
-    HAVING totalQuantity < 20;
+app.get("/api/toprawmats", (req, res) => {
+  const query = `
+  SELECT
+		oi.matId,
+    rm.matName,
+    s.supplyName,
+    SUM(oi.quantity) AS totalOrdered
+FROM
+    tblorderfromsupplier_items oi
+JOIN tblordersfromsupplier od ON oi.orderId = od.orderId
+JOIN tblrawmats rm ON oi.matId = rm.matId
+JOIN tblsuppliers s ON od.supplyId = s.supplyId
+GROUP BY od.supplyId , rm.matName, s.supplyName
+ORDER BY totalOrdered DESC;
+
   `;
-
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching inventory items:", err);
-      return res.status(500).send("Error fetching inventory items");
+  db.query(query, (error, results) => {
+    if (error) {
+      console.error("Error fetching raw:", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error fetching raw." });
     }
-    return res.json(results);
+    res.status(200).json(results);
   });
 });
 
-app.get("/api/rawmatsdashboard", async (req, res) => {
+app.get("/api/dashboard", async (req, res) => {
   try {
-    const query = `SELECT 
-      raw.matName, 
-      COALESCE(SUM(odi.remaining_quantity), 0) AS total_remaining_quantity
-    FROM 
-      tblrawmats raw
-    LEFT JOIN 
-      tblorderfromsupplier_items odi ON raw.matId = odi.matId
-    GROUP BY 
-      raw.matName, raw.category, raw.matId
-    HAVING 
-      COALESCE(SUM(odi.remaining_quantity), 0) < 20
-    ORDER BY 
-      total_remaining_quantity DESC;`;
+    // Inventory Items query
+    const inventoryQuery = `
+        SELECT it.ItemName, it.quantity AS Remaining, COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity 
+        FROM tblitems it 
+        LEFT JOIN tblproduction p ON it.itemId = p.itemId 
+        GROUP BY it.itemId 
+        HAVING totalQuantity < 20;
+      `;
 
-    db.query(query, (error, results) => {
-      if (error) {
-        console.error("Error fetching raw materials: ", error);
-        res.status(500).send("Server Error");
-      } else {
-        res.json(results);
-      }
+    // Raw Materials query
+    const rawMatsQuery = `
+        SELECT 
+          raw.matName, 
+          COALESCE(SUM(odi.remaining_quantity), 0) AS total_remaining_quantity
+        FROM 
+          tblrawmats raw
+        LEFT JOIN 
+          tblorderfromsupplier_items odi ON raw.matId = odi.matId
+        GROUP BY 
+          raw.matName, raw.category, raw.matId
+        HAVING 
+          COALESCE(SUM(odi.remaining_quantity), 0) < 20
+        ORDER BY 
+          total_remaining_quantity DESC;
+      `;
+
+    // Supplier Deliveries query
+    const supDeliQuery = `
+        SELECT  
+          sp.supplyName,
+          od.totalCost AS totalCost,
+          IFNULL(DATE_FORMAT(od.orderDate, '%Y-%m-%d'), 'N/A') AS OrderDate,
+          SUM(odi.quantity) AS totalQuantity
+        FROM tblsuppliers sp
+        LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
+        LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
+        WHERE odi.quantity IS NOT NULL AND od.status = 0
+        GROUP BY od.orderId, sp.supplyName, od.status, od.totalCost, sp.supplyId;
+      `;
+
+    // Production Dashboard query
+    const prodQuery = `
+        SELECT pd.staffName, it.itemName 
+        FROM tblproduction pd 
+        LEFT JOIN tblitems it ON pd.itemId = it.itemId 
+        WHERE pd.production_status = 0 
+        ORDER BY pd.production_status ASC;
+      `;
+
+    const prodMat = `
+      SELECT
+		oi.matId,
+    rm.matName,
+    s.supplyName,
+    SUM(oi.quantity) AS totalOrdered
+FROM
+    tblorderfromsupplier_items oi
+JOIN tblordersfromsupplier od ON oi.orderId = od.orderId
+JOIN tblrawmats rm ON oi.matId = rm.matId
+JOIN tblsuppliers s ON od.supplyId = s.supplyId
+GROUP BY od.supplyId , rm.matName, s.supplyName
+ORDER BY totalOrdered DESC
+LIMIT 5;
+
+      `;
+
+    // Execute all queries concurrently
+    const results = await Promise.all([
+      new Promise((resolve, reject) => {
+        db.query(inventoryQuery, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        db.query(rawMatsQuery, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        db.query(supDeliQuery, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        db.query(prodQuery, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        db.query(prodMat, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      }),
+    ]);
+
+    // Destructure the results into separate variables
+    const [
+      inventory,
+      rawMaterials,
+      supplierDeliveries,
+      production,
+      productionMaterials,
+    ] = results;
+
+    // Send all data as a single response
+    res.json({
+      inventory,
+      rawMaterials,
+      supplierDeliveries,
+      production,
+      productionMaterials,
     });
   } catch (error) {
-    console.error("Error in fetching raw materials: ", error);
+    console.error("Error fetching dashboard data: ", error);
     res.status(500).send("Server Error");
   }
 });
-
-app.get("/api/supDeliDashboard", async (req, res) => {
-  try {
-    // Adjust the query to match your table structure and required fields
-    const query = `
-      SELECT  
-      
-        sp.supplyName,
-        od.totalCost AS totalCost,
-       IFNULL(DATE_FORMAT(od.orderDate, '%Y-%m-%d'), 'N/A') AS OrderDate,
-        SUM(odi.quantity) AS totalQuantity
-      FROM tblsuppliers sp
-      LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
-      LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
-      WHERE odi.quantity IS NOT NULL AND od.status = 0
-      GROUP BY od.orderId, sp.supplyName, od.status, od.totalCost, sp.supplyId;  -- Ensure to group by orderId
-    `;
-
-    db.query(query, (error, results) => {
-      if (error) {
-        console.error("Error fetching supply deliveries: ", error);
-        return res.status(500).send("Server Error");
-      }
-
-      // Ensure results have data
-      if (results.length > 0) {
-        return res.json(results);
-      }
-    });
-  } catch (error) {
-    console.error("Error in fetching supply deliveries: ", error);
-    res.status(500).send("Server Error");
-  }
-});
-
-app.get("/api/productionDashboard", (req, res) => {
-  const query =
-    "SELECT pd.staffName, it.itemName FROM tblproduction pd LEFT JOIN tblitems it ON pd.itemId = it.itemId WHERE pd.production_status = 0 ORDER BY pd.production_status ASC;";
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).send(err);
-    res.json(results);
-  });
-});
-
 /////////////////////////////================= DASHBOARD
 
 //////////////=========DOCUMENT============>
@@ -897,8 +1020,8 @@ app.get("/api/productionDashboard", (req, res) => {
 //getting the whole table from inventory
 app.get("/api/item", (req, res) => {
   const sql = `
-       SELECT it.* ,  COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  FROM tblitems it LEFT JOIN tblproduction p ON it.itemId = p.itemId GROUP BY it.itemId;
-    `;
+        SELECT it.* ,  COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  FROM tblitems it LEFT JOIN tblproduction p ON it.itemId = p.itemId GROUP BY it.itemId;
+      `;
 
   db.query(sql, (err, results) => {
     if (err) {
@@ -911,23 +1034,23 @@ app.get("/api/item", (req, res) => {
 
 app.get("/api/products", (req, res) => {
   const sql = `
-        SELECT 
-            p.*,
-            i.itemId,
-            i.itemName,
-            i.price,
-            i.quantity,
-            i.category,
-            i.description,
-            COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  -- Total quantity from tblproduction
-        FROM 
-            tblitems i
-        LEFT JOIN 
-            tblproduction p ON i.itemId = p.itemId  
-        WHERE p.production_status = 1	
-        GROUP BY 
-           p.itemId;  
-    `;
+          SELECT 
+              p.*,
+              i.itemId,
+              i.itemName,
+              i.price,
+              i.quantity,
+              i.category,
+              i.description,
+              COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  -- Total quantity from tblproduction
+          FROM 
+              tblitems i
+          LEFT JOIN 
+              tblproduction p ON i.itemId = p.itemId  
+          WHERE p.production_status = 1	
+          GROUP BY 
+            p.itemId;  
+      `;
 
   db.query(sql, (err, results) => {
     if (err) {
@@ -1074,9 +1197,9 @@ app.put("/api/updateitem/:id", (req, res) => {
 
       // Step 1: Update item details
       const updateItemQuery = `
-        UPDATE tblitems
-        SET itemName = ?, price = ?, category = ?, description = ?
-        WHERE itemId = ?`;
+          UPDATE tblitems
+          SET itemName = ?, price = ?, category = ?, description = ?
+          WHERE itemId = ?`;
 
       connection.query(
         updateItemQuery,
@@ -1092,8 +1215,8 @@ app.put("/api/updateitem/:id", (req, res) => {
 
           // Step 2: Delete old materials
           const deleteMaterialsQuery = `
-          DELETE FROM tblitem_ingredients
-          WHERE itemId = ?`;
+            DELETE FROM tblitem_ingredients
+            WHERE itemId = ?`;
 
           connection.query(deleteMaterialsQuery, [id], (err) => {
             if (err) {
@@ -1109,8 +1232,8 @@ app.put("/api/updateitem/:id", (req, res) => {
             // Step 3: Insert new materials
             if (materials && materials.length > 0) {
               const insertMaterialsQuery = `
-              INSERT INTO tblitem_ingredients (itemId, matId)
-              VALUES ?`;
+                INSERT INTO tblitem_ingredients (itemId, matId)
+                VALUES ?`;
 
               const values = materials.map((matId) => [id, matId]);
 
@@ -1171,10 +1294,10 @@ app.get("/api/item/:id/materials", (req, res) => {
   const { id } = req.params;
 
   const query = `
-    SELECT rm.matId, rm.matName, rm.category
-    FROM tblrawmats rm
-    INNER JOIN tblitem_ingredients ii ON rm.matId = ii.matId
-    WHERE ii.itemId = ?`;
+      SELECT rm.matId, rm.matName, rm.category
+      FROM tblrawmats rm
+      INNER JOIN tblitem_ingredients ii ON rm.matId = ii.matId
+      WHERE ii.itemId = ?`;
 
   db.query(query, [id], (err, results) => {
     if (err) {
@@ -1191,9 +1314,9 @@ app.delete("/api/deleteitem/:id", (req, res) => {
 
   // First, check if the item has any associated materials
   const checkMaterialsQuery = `
-    SELECT COUNT(*) AS materialCount
-    FROM tblitem_ingredients
-    WHERE itemId = ?`;
+      SELECT COUNT(*) AS materialCount
+      FROM tblitem_ingredients
+      WHERE itemId = ?`;
 
   db.query(checkMaterialsQuery, [id], (err, results) => {
     if (err) {
@@ -1251,16 +1374,16 @@ app.get("/api/inventory/:itemId", (req, res) => {
 app.get("/api/inventory-by-items/:itemId", (req, res) => {
   const itemId = req.params.itemId;
   const sql = `
-       SELECT 
-            tblinventory.inventoryId,
-            tblinventory.quantity,
-            tblproduction.productionDate,
-            tblinventory.lastUpdated
-        FROM tblinventory
-        JOIN tblproduction ON tblinventory.productionId = tblproduction.productionId
-        WHERE tblproduction.itemId = ?
-          AND tblinventory.quantity != 0
-    `;
+        SELECT 
+              tblinventory.inventoryId,
+              tblinventory.quantity,
+              tblproduction.productionDate,
+              tblinventory.lastUpdated
+          FROM tblinventory
+          JOIN tblproduction ON tblinventory.productionId = tblproduction.productionId
+          WHERE tblproduction.itemId = ?
+            AND tblinventory.quantity != 0
+      `;
 
   db.query(sql, [itemId], (err, result) => {
     if (err) {
@@ -1318,9 +1441,9 @@ app.get("/api/rawmatsinv/:matId", (req, res) => {
   const matId = req.params.matId;
 
   const query = `
-          SELECT odi.orderItemId, raw.matName , raw.category , odi.orderId , odi.totalCost, odi.remaining_quantity , odi.quantity AS OrderedQuantity , odi.quantity_received as ReceivedQuantity ,od.orderDate as dateOrdered , odi.dateReceive as ReceivedDate FROM tblrawmats raw LEFT JOIN tblorderfromsupplier_items odi ON raw.matId = odi.matId LEFT JOIN tblordersfromsupplier od ON odi.orderId = od.orderId WHERE odi.matId = ? AND odi.status = 1;
+            SELECT odi.orderItemId, raw.matName , raw.category , odi.orderId , odi.totalCost, odi.remaining_quantity , odi.quantity AS OrderedQuantity , odi.quantity_received as ReceivedQuantity ,od.orderDate as dateOrdered , odi.dateReceive as ReceivedDate FROM tblrawmats raw LEFT JOIN tblorderfromsupplier_items odi ON raw.matId = odi.matId LEFT JOIN tblordersfromsupplier od ON odi.orderId = od.orderId WHERE odi.matId = ? AND odi.status = 1;
 
-    `;
+      `;
 
   db.query(query, [matId], (error, results) => {
     if (error) {
@@ -1337,15 +1460,15 @@ app.get("/api/rawmatsinv/:matId", (req, res) => {
 app.get("/api/rawmatsinv", (req, res) => {
   // Query to fetch all raw materials inventory details
   const query = `
-        SELECT 
-            tblrawmatsinv.inventoryId,
-            tblsupdeli.matId,
-            tblrawmatsinv.quantity,
-            tblsupdeli.date,
-            tblrawmatsinv.lastUpdated
-        FROM tblrawmatsinv
-        JOIN tblsupdeli ON tblrawmatsinv.supDeliId = tblsupdeli.supDeliId
-    `;
+          SELECT 
+              tblrawmatsinv.inventoryId,
+              tblsupdeli.matId,
+              tblrawmatsinv.quantity,
+              tblsupdeli.date,
+              tblrawmatsinv.lastUpdated
+          FROM tblrawmatsinv
+          JOIN tblsupdeli ON tblrawmatsinv.supDeliId = tblsupdeli.supDeliId
+      `;
 
   db.query(query, (error, results) => {
     if (error) {
@@ -1365,19 +1488,19 @@ app.get("/hello", (req, res) => {});
 app.get("/api/rawmats", async (req, res) => {
   try {
     const query = `SELECT 
-    odi.orderId,
-  raw.matName, 
-  raw.category, 
-  raw.matId, 
-  COALESCE(SUM(odi.remaining_quantity), 0) AS total_remaining_quantity
-FROM 
-  tblrawmats raw
-LEFT JOIN 
-  tblorderfromsupplier_items odi ON raw.matId = odi.matId
+      odi.orderId,
+    raw.matName, 
+    raw.category, 
+    raw.matId, 
+    COALESCE(SUM(odi.remaining_quantity), 0) AS total_remaining_quantity
+  FROM 
+    tblrawmats raw
+  LEFT JOIN 
+    tblorderfromsupplier_items odi ON raw.matId = odi.matId
 
-GROUP BY 
-  raw.matName, raw.category, raw.matId
-	ORDER BY raw.matId DESC;`;
+  GROUP BY 
+    raw.matName, raw.category, raw.matId
+    ORDER BY raw.matId DESC;`;
     db.query(query, (error, results) => {
       if (error) {
         console.error("Error fetching raw materials: ", error);
@@ -1396,7 +1519,7 @@ GROUP BY
 app.post("/api/addmats", (req, res) => {
   const { matName, category } = req.body; // Use matName to match the frontend
   const sql =
-    "INSERT INTO tblRawMats (matName, quantity, category) VALUES (?, 0, ?)";
+    "INSERT INTO tblrawmats (matName, quantity, category) VALUES (?, 0, ?)";
   db.query(sql, [matName, category], (err, result) => {
     if (err) {
       console.error("Error adding inventory item:", err);
@@ -1409,7 +1532,7 @@ app.post("/api/addmats", (req, res) => {
 // Fetch item by ID
 app.get("/api/updatemats/:matId", (req, res) => {
   const { matId } = req.params;
-  const sql = "SELECT * FROM tblRawMats WHERE matId = ?"; // Correct table name and field
+  const sql = "SELECT * FROM tblrawmats WHERE matId = ?"; // Correct table name and field
 
   db.query(sql, [matId], (err, result) => {
     if (err) {
@@ -1429,7 +1552,7 @@ app.put("/api/updatemats/:matId", (req, res) => {
   const { matName, quantity, category } = req.body;
 
   const sql =
-    "UPDATE tblRawMats SET matName = ?, quantity = ?, category = ? WHERE matId = ?";
+    "UPDATE tblrawmats SET matName = ?, quantity = ?, category = ? WHERE matId = ?";
 
   db.query(sql, [matName, quantity, category, matId], (err, result) => {
     if (err) {
@@ -1449,7 +1572,7 @@ app.put("/api/updatemats/:matId", (req, res) => {
 //deleting item in inventory
 app.delete("/api/deletemats/:id", (req, res) => {
   const { id } = req.params;
-  const sql = "DELETE FROM tblRawMats WHERE matId = ?";
+  const sql = "DELETE FROM tblrawmats WHERE matId = ?";
 
   db.query(sql, [id], (err, result) => {
     if (err) {
@@ -1465,15 +1588,15 @@ app.delete("/api/deletemats/:id", (req, res) => {
 
 app.get("/api/rawmats-inventory", (req, res) => {
   const sqlQuery = `
-        SELECT 
-            inv.inventoryId,
-            inv.matId,
-            inv.quantity,
-            inv.status,
-            inv.lastUpdated
-        FROM 
-            tblrawmatsinv inv;
-    `;
+          SELECT 
+              inv.inventoryId,
+              inv.matId,
+              inv.quantity,
+              inv.status,
+              inv.lastUpdated
+          FROM 
+              tblrawmatsinv inv;
+      `;
 
   db.query(sqlQuery, (err, results) => {
     if (err) {
@@ -1489,24 +1612,24 @@ app.get("/api/rawmats-data/:matId", (req, res) => {
   const { matId } = req.params; // Get the matId from the request parameters
 
   const query = `
-        SELECT 
-            r.matId AS rawMatId,
-            r.matName AS itemName,
-            i.quantity,
-            d.cost,
-            d.date,
-            i.status,
-            i.lastUpdated,
-            (SELECT s.supplyName FROM tblsuppliers s WHERE d.supplyId = s.supplyId) AS supplierName
-        FROM 
-            tblrawmatsinv i
-        JOIN 
-            tblsupdeli d ON d.supDeliId = i.supDeliId  -- Join tblrawmatsinv with tblsupdeli using supDeliId
-        JOIN 
-            tblrawmats r ON r.matId = d.matId  -- Join tblsupdeli with tblrawmats using matId
-        WHERE 
-            r.matId = ?  -- Filter by the specific matId
-    `;
+          SELECT 
+              r.matId AS rawMatId,
+              r.matName AS itemName,
+              i.quantity,
+              d.cost,
+              d.date,
+              i.status,
+              i.lastUpdated,
+              (SELECT s.supplyName FROM tblsuppliers s WHERE d.supplyId = s.supplyId) AS supplierName
+          FROM 
+              tblrawmatsinv i
+          JOIN 
+              tblsupdeli d ON d.supDeliId = i.supDeliId  -- Join tblrawmatsinv with tblsupdeli using supDeliId
+          JOIN 
+              tblrawmats r ON r.matId = d.matId  -- Join tblsupdeli with tblrawmats using matId
+          WHERE 
+              r.matId = ?  -- Filter by the specific matId
+      `;
 
   db.query(query, [matId], (err, results) => {
     // Pass matId as a parameter
@@ -1585,13 +1708,13 @@ app.delete("/api/deleteSupDeli/:id", (req, res) => {
 app.get("/api/supplier", async (req, res) => {
   try {
     const query = `
-            SELECT s.supplyId, s.supplyName,  s.contact, 
-            GROUP_CONCAT(r.matName) AS products
-            FROM tblsuppliers s
-            LEFT JOIN tblsupplierrawmats sr ON s.supplyId = sr.supplierId
-            LEFT JOIN tblrawmats r ON sr.rawMatId = r.matId
-            GROUP BY s.supplyId;
-        `;
+              SELECT s.supplyId, s.supplyName,  s.contact, 
+              GROUP_CONCAT(r.matName) AS products
+              FROM tblsuppliers s
+              LEFT JOIN tblsupplierrawmats sr ON s.supplyId = sr.supplierId
+              LEFT JOIN tblrawmats r ON sr.rawMatId = r.matId
+              GROUP BY s.supplyId;
+          `;
     db.query(query, (error, results) => {
       if (error) {
         console.error("Error fetching supplier data: ", error);
@@ -1613,14 +1736,14 @@ app.get("/api/supplier/:id", async (req, res) => {
   try {
     const [results] = await db.query(
       `
-            SELECT s.supplyId, s.supplyName,  s.contact, 
-                   GROUP_CONCAT(r.matName) AS products
-            FROM tblsuppliers s
-            LEFT JOIN tblsupplierrawmats sr ON s.supplyId = sr.supplierId
-            LEFT JOIN tblrawmats r ON sr.rawMatId = r.matId
-            WHERE s.supplyId = ?
-            GROUP BY s.supplyId
-        `,
+              SELECT s.supplyId, s.supplyName,  s.contact, 
+                    GROUP_CONCAT(r.matName) AS products
+              FROM tblsuppliers s
+              LEFT JOIN tblsupplierrawmats sr ON s.supplyId = sr.supplierId
+              LEFT JOIN tblrawmats r ON sr.rawMatId = r.matId
+              WHERE s.supplyId = ?
+              GROUP BY s.supplyId
+          `,
       [supplyId]
     ); // Pass the supplyId as a parameter
 
@@ -1650,9 +1773,9 @@ app.post("/api/addsupplier", async (req, res) => {
       // Check if products array exists and has data
       if (products && products.length > 0) {
         const supplierRawMatsQuery = `
-          INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price)
-          VALUES ${products.map(() => "(?, ?, ?)").join(", ")}
-        `;
+            INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price)
+            VALUES ${products.map(() => "(?, ?, ?)").join(", ")}
+          `;
         const supplierRawMatsValues = products.flatMap((p) => [
           newSupplierId,
           p.productId,
@@ -1681,11 +1804,11 @@ app.get("/api/supplier/:supplierId/rawmats", (req, res) => {
   const supplierId = req.params.supplierId;
 
   const query = `
-        SELECT rm.matId as rawMatId, rm.matName ,sr.price
-        FROM tblsupplierrawmats sr
-        JOIN tblrawmats rm ON sr.rawMatId = rm.matId
-        WHERE sr.supplierId = ?
-    `;
+          SELECT rm.matId as rawMatId, rm.matName ,sr.price
+          FROM tblsupplierrawmats sr
+          JOIN tblrawmats rm ON sr.rawMatId = rm.matId
+          WHERE sr.supplierId = ?
+      `;
 
   db.query(query, [supplierId], (err, results) => {
     if (err) {
@@ -1709,10 +1832,10 @@ app.put("/api/supplier/:id", async (req, res) => {
 
   try {
     const supplierQuery = `
-      UPDATE tblsuppliers 
-      SET supplyName = ?, contact = ? 
-      WHERE supplyId = ?
-    `;
+        UPDATE tblsuppliers 
+        SET supplyName = ?, contact = ? 
+        WHERE supplyId = ?
+      `;
     const supplierValues = [supplyName, contact, supplierId];
 
     db.query(supplierQuery, supplierValues, (error, results) => {
@@ -1734,9 +1857,9 @@ app.put("/api/supplier/:id", async (req, res) => {
 
         if (product && product.length > 0) {
           const supplierRawMatsQuery = `
-            INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price) 
-            VALUES ${product.map(() => "(?, ?, ?)").join(", ")}
-          `;
+              INSERT INTO tblsupplierrawmats (supplierId, rawMatId, price) 
+              VALUES ${product.map(() => "(?, ?, ?)").join(", ")}
+            `;
           const supplierRawMatsValues = product.flatMap((p) => [
             supplierId,
             p.rawMatId,
@@ -1847,10 +1970,10 @@ app.put("/api/updateItemAndOrderStatus", async (req, res) => {
   try {
     // 1. Verify that the orderId exists in the tblorders table
     const checkOrderExistsQuery = `
-      SELECT COUNT(*) AS orderExists
-      FROM tblordersfromsupplier
-      WHERE orderId = ?
-    `;
+        SELECT COUNT(*) AS orderExists
+        FROM tblordersfromsupplier
+        WHERE orderId = ?
+      `;
 
     db.query(checkOrderExistsQuery, [orderId], (error, checkResults) => {
       if (error) {
@@ -1871,13 +1994,13 @@ app.put("/api/updateItemAndOrderStatus", async (req, res) => {
 
       // 2. Proceed with updating the item
       const updateItemQuery = `
-        UPDATE tblorderfromsupplier_items 
-        SET remaining_quantity = ?, 
-            quantity_received = ?, 
-            status = 1, 
-            dateReceive = CURDATE()  -- Set today's date
-        WHERE orderItemId = ?
-      `;
+          UPDATE tblorderfromsupplier_items 
+          SET remaining_quantity = ?, 
+              quantity_received = ?, 
+              status = 1, 
+              dateReceive = CURDATE()  -- Set today's date
+          WHERE orderItemId = ?
+        `;
       const updateItemValues = [
         receivedQuantity,
         receivedQuantity,
@@ -1894,10 +2017,10 @@ app.put("/api/updateItemAndOrderStatus", async (req, res) => {
 
         // 3. Check if all items in the order are received
         const checkOrderQuery = `
-          SELECT COUNT(*) AS pendingItems 
-          FROM tblorderfromsupplier_items 
-          WHERE orderId = ? AND status != 1
-        `;
+            SELECT COUNT(*) AS pendingItems 
+            FROM tblorderfromsupplier_items 
+            WHERE orderId = ? AND status != 1
+          `;
         db.query(checkOrderQuery, [orderId], (error, checkResults) => {
           if (error) {
             console.error("Error checking order status:", error);
@@ -1910,10 +2033,10 @@ app.put("/api/updateItemAndOrderStatus", async (req, res) => {
 
           if (allItemsReceived) {
             const updateOrderQuery = `
-              UPDATE tblordersfromsupplier 
-              SET status = 1 
-              WHERE orderId = ?
-            `;
+                UPDATE tblordersfromsupplier 
+                SET status = 1 
+                WHERE orderId = ?
+              `;
             db.query(updateOrderQuery, [orderId], (error, orderResults) => {
               if (error) {
                 console.error("Error updating order status:", error);
@@ -1956,20 +2079,20 @@ app.get("/api/supDeli", async (req, res) => {
   try {
     // Adjust the query to match your table structure and required fields
     const query = `
-      SELECT  
-        od.orderId,
-        sp.supplyId,
-        sp.supplyName,
-        od.status,
-        od.totalCost AS totalCost,
-        MAX(od.orderDate) AS orderDate,  -- Use MAX to get the latest orderDate for each supplier
-        SUM(odi.quantity) AS totalQuantity
-      FROM tblsuppliers sp
-      LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
-      LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
-      WHERE odi.quantity IS NOT NULL
-      GROUP BY od.orderId, sp.supplyName, od.status, od.totalCost, sp.supplyId;  -- Ensure to group by orderId
-    `;
+        SELECT  
+          od.orderId,
+          sp.supplyId,
+          sp.supplyName,
+          od.status,
+          od.totalCost AS totalCost,
+          MAX(od.orderDate) AS orderDate,  -- Use MAX to get the latest orderDate for each supplier
+          SUM(odi.quantity) AS totalQuantity
+        FROM tblsuppliers sp
+        LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
+        LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
+        WHERE odi.quantity IS NOT NULL
+        GROUP BY od.orderId, sp.supplyName, od.status, od.totalCost, sp.supplyId;  -- Ensure to group by orderId
+      `;
 
     db.query(query, (error, results) => {
       if (error) {
@@ -1982,27 +2105,27 @@ app.get("/api/supDeli", async (req, res) => {
         // Create detailed queries for each supplier and order
         const detailedQueries = results.map((supplier) => {
           const productQuery = `
-            SELECT 
-              sp.supplyName,
-              od.totalCost,
-              od.orderDate,
-              odi.orderId,
-              odi.orderItemId,
-              odi.status as itemStatus,
-              odi.price,
-              odi.totalCost AS itemTotal,
-              odi.quantity,
-              mat.matName,
-              mat.matId
-            FROM tblsuppliers sp
-            LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
-            LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
-            LEFT JOIN tblrawmats mat ON mat.matId = odi.matId
-            WHERE odi.orderId = ${supplier.orderId}  
-              AND sp.supplyId = ${supplier.supplyId}  
-              AND odi.quantity IS NOT NULL
-              AND mat.matId IS NOT NULL;
-          `;
+              SELECT 
+                sp.supplyName,
+                od.totalCost,
+                od.orderDate,
+                odi.orderId,
+                odi.orderItemId,
+                odi.status as itemStatus,
+                odi.price,
+                odi.totalCost AS itemTotal,
+                odi.quantity,
+                mat.matName,
+                mat.matId
+              FROM tblsuppliers sp
+              LEFT JOIN tblordersfromsupplier od ON sp.supplyId = od.supplyId
+              LEFT JOIN tblorderfromsupplier_items odi ON od.orderId = odi.orderId
+              LEFT JOIN tblrawmats mat ON mat.matId = odi.matId
+              WHERE odi.orderId = ${supplier.orderId}  
+                AND sp.supplyId = ${supplier.supplyId}  
+                AND odi.quantity IS NOT NULL
+                AND mat.matId IS NOT NULL;
+            `;
 
           return new Promise((resolve, reject) => {
             db.query(productQuery, (error, productResults) => {
@@ -2106,8 +2229,8 @@ app.delete("/api/deletesupplier/:id", (req, res) => {
 
   // First, delete records from tblrawmatsinv that reference supDeliId in tblsupdeli
   const deleteRawMatsInvQuery = `
-    DELETE FROM tblrawmatsinv WHERE supDeliId IN (SELECT supDeliId FROM tblsupdeli WHERE supplyId = ?)
-  `;
+      DELETE FROM tblrawmatsinv WHERE supDeliId IN (SELECT supDeliId FROM tblsupdeli WHERE supplyId = ?)
+    `;
   db.query(deleteRawMatsInvQuery, [supplierId], (err) => {
     if (err) {
       console.error("Error deleting raw materials inventory records:", err);
@@ -2118,8 +2241,8 @@ app.delete("/api/deletesupplier/:id", (req, res) => {
 
     // Next, delete records in tblsupdeli that reference the supplierId
     const deleteSupDeliQuery = `
-      DELETE FROM tblsupdeli WHERE supplyId = ?
-    `;
+        DELETE FROM tblsupdeli WHERE supplyId = ?
+      `;
     db.query(deleteSupDeliQuery, [supplierId], (err) => {
       if (err) {
         console.error("Error deleting supplier delivery records:", err);
@@ -2128,8 +2251,8 @@ app.delete("/api/deletesupplier/:id", (req, res) => {
 
       // Then, delete raw materials associated with the supplier
       const deleteRawMaterialsQuery = `
-        DELETE FROM tblsupplierrawmats WHERE supplierId = ?
-      `;
+          DELETE FROM tblsupplierrawmats WHERE supplierId = ?
+        `;
       db.query(deleteRawMaterialsQuery, [supplierId], (err) => {
         if (err) {
           console.error("Error deleting raw materials:", err);
@@ -2138,8 +2261,8 @@ app.delete("/api/deletesupplier/:id", (req, res) => {
 
         // Finally, delete the supplier itself
         const deleteSupplierQuery = `
-          DELETE FROM tblsuppliers WHERE supplyId = ?
-        `;
+            DELETE FROM tblsuppliers WHERE supplyId = ?
+          `;
         db.query(deleteSupplierQuery, [supplierId], (err, result) => {
           if (err) {
             console.error("Error deleting supplier:", err);
@@ -2165,18 +2288,18 @@ app.get("/api/supDeli/:supplierId", async (req, res) => {
 
   try {
     const query = `
-      SELECT 
-        sr.rawMatId,
-        rm.matName,
-        sr.price
-      FROM 
-        tblsupplierrawmats sr
-      JOIN 
-        tblrawmats rm ON sr.rawMatId = rm.matId
-      WHERE 
-        sr.supplierId = ?
-      ORDER BY 
-        rm.matName ASC`; // Order alphabetically by material name for better readability
+        SELECT 
+          sr.rawMatId,
+          rm.matName,
+          sr.price
+        FROM 
+          tblsupplierrawmats sr
+        JOIN 
+          tblrawmats rm ON sr.rawMatId = rm.matId
+        WHERE 
+          sr.supplierId = ?
+        ORDER BY 
+          rm.matName ASC`; // Order alphabetically by material name for better readability
 
     db.query(query, [supplierId], (error, results) => {
       if (error) {
@@ -2197,84 +2320,84 @@ app.get("/api/supDeli/:id", async (req, res) => {
 
   try {
     const query = `
-            SELECT 
-                sd.supDeliId, 
-                sd.supplyId, 
-                rm.matName, 
-                sd.quantity, 
-                sd.cost, app.post("/api/addLogs", (req, res) => {
-  const { logName, logDescription, logDate } = req.body;
-  const sql = "INSERT INTO tbllogs (logName, logDescription, logDate) VALUES (?, ?, ?)";
-  db.query(sql, [logName, logDescription, logDate], (err, result) => {
-    if (err) {
-      console.error("Error adding log:", err);
-      return res.status(500).send("Error adding log");
-    }
-    res.status(201).send("Log added successfully");
+              SELECT 
+                  sd.supDeliId, 
+                  sd.supplyId, 
+                  rm.matName, 
+                  sd.quantity, 
+                  sd.cost, app.post("/api/addLogs", (req, res) => {
+    const { logName, logDescription, logDate } = req.body;
+    const sql = "INSERT INTO tbllogs (logName, logDescription, logDate) VALUES (?, ?, ?)";
+    db.query(sql, [logName, logDescription, logDate], (err, result) => {
+      if (err) {
+        console.error("Error adding log:", err);
+        return res.status(500).send("Error adding log");
+      }
+      res.status(201).send("Log added successfully");
+    });
   });
-});
 
-app.get("/api/logs", (req, res) => {
-  const sql = "SELECT * FROM tbllogs";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching logs:", err);
-      return res.status(500).send("Error fetching logs");
-    }
-    res.json(results);
+  app.get("/api/logs", (req, res) => {
+    const sql = "SELECT * FROM tbllogs";
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error("Error fetching logs:", err);
+        return res.status(500).send("Error fetching logs");
+      }
+      res.json(results);
+    });
   });
-});
 
-app.get("/api/logs/:id", (req, res) => {
-  const id = req.params.id;
-  const sql = "SELECT * FROM tbllogs WHERE logId = ?";
-  db.query(sql, [id], (err, result) => {
-    if (err) {
-      console.error("Error fetching log:", err);
-      return res.status(500).send("Error fetching log");
-    }
-    if (result.length === 0) {
-      return res.status(404).send("Log not found");
-    }
-    res.json(result[0]);
+  app.get("/api/logs/:id", (req, res) => {
+    const id = req.params.id;
+    const sql = "SELECT * FROM tbllogs WHERE logId = ?";
+    db.query(sql, [id], (err, result) => {
+      if (err) {
+        console.error("Error fetching log:", err);
+        return res.status(500).send("Error fetching log");
+      }
+      if (result.length === 0) {
+        return res.status(404).send("Log not found");
+      }
+      res.json(result[0]);
+    });
   });
-});
 
-app.put("/api/logs/:id", (req, res) => {
-  const id = req.params.id;
-  const { logName, logDescription, logDate } = req.body;
-  const sql = "UPDATE tbllogs SET logName = ?, logDescription = ?, logDate = ? WHERE logId = ?";
-  db.query(sql, [logName, logDescription, logDate, id], (err, result) => {
-    if (err) {
-      console.error("Error updating log:", err);
-      return res.status(500).send("Error updating log");
-    }
-    if (result.affectedRows === 0) {
-      return res.status(404).send("Log not found");
-    }
-    res.send("Log updated successfully");
+  app.put("/api/logs/:id", (req, res) => {
+    const id = req.params.id;
+    const { logName, logDescription, logDate } = req.body;
+    const sql = "UPDATE tbllogs SET logName = ?, logDescription = ?, logDate = ? WHERE logId = ?";
+    db.query(sql, [logName, logDescription, logDate, id], (err, result) => {
+      if (err) {
+        console.error("Error updating log:", err);
+        return res.status(500).send("Error updating log");
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).send("Log not found");
+      }
+      res.send("Log updated successfully");
+    });
   });
-});
 
-app.delete("/api/logs/:id", (req, res) => {
-  const id = req.params.id;
-  const sql = "DELETE FROM tbllogs WHERE logId = ?";
-  db.query(sql, [id], (err, result) => {
-    if (err) {
-      console.error("Error deleting log:", err);
-      return res.status(500).send("Error deleting log");
-    }
-    if (result.affectedRows === 0) {
-      return res.status(404ate 
-            FROM 
-                tblSupDeli sd 
-            JOIN 
-                tblrawmats rm ON sd.matId = rm.matId
-            WHERE 
-                sd.supplyId = ?
-            ORDER BY 
-                sd.date DESC;
-            `; // Add the WHERE clause to filter by supplyId
+  app.delete("/api/logs/:id", (req, res) => {
+    const id = req.params.id;
+    const sql = "DELETE FROM tbllogs WHERE logId = ?";
+    db.query(sql, [id], (err, result) => {
+      if (err) {
+        console.error("Error deleting log:", err);
+        return res.status(500).send("Error deleting log");
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404ate 
+              FROM 
+                  tblSupDeli sd 
+              JOIN 
+                  tblrawmats rm ON sd.matId = rm.matId
+              WHERE 
+                  sd.supplyId = ?
+              ORDER BY 
+                  sd.date DESC;
+              `; // Add the WHERE clause to filter by supplyId
     // Pass the supplyId as a parameter to the query
     db.query(query, [supplyId], (error, results) => {
       if (error) {
@@ -2366,10 +2489,10 @@ app.get("/api/getrawmaterials/:supplierId", (req, res) => {
 
   // Query to fetch raw material names based on the supplierId
   const query = `
-        SELECT r.matName , r.matId , s.price
-        FROM tblsupplierrawmats s
-        JOIN tblrawmats r ON s.rawMatId = r.matId
-        WHERE s.supplierId = ?`;
+          SELECT r.matName , r.matId , s.price
+          FROM tblsupplierrawmats s
+          JOIN tblrawmats r ON s.rawMatId = r.matId
+          WHERE s.supplierId = ?`;
 
   db.query(query, [supplierId], (error, results) => {
     if (error) {
@@ -2392,9 +2515,9 @@ app.post("/api/addsupplydelivery", (req, res) => {
 
   // Query to insert the new supply delivery into tblSupDeli
   const insertQuery = `
-        INSERT INTO tblSupDeli (supplyId, matId, quantity, cost, date) 
-        VALUES (?, ?, ?, ?, ?)
-    `;
+          INSERT INTO tblSupDeli (supplyId, matId, quantity, cost, date) 
+          VALUES (?, ?, ?, ?, ?)
+      `;
   const insertValues = [supplyId, matId, quantity, cost, date];
 
   db.query(insertQuery, insertValues, (error, results) => {
@@ -2406,10 +2529,10 @@ app.post("/api/addsupplydelivery", (req, res) => {
 
       // Update the quantity in tblrawmats
       const updateQuery = `
-                UPDATE tblrawmats 
-                SET quantity = quantity + ? 
-                WHERE matid = ?
-            `;
+                  UPDATE tblrawmats 
+                  SET quantity = quantity + ? 
+                  WHERE matid = ?
+              `;
       const updateValues = [quantity, matId];
 
       db.query(updateQuery, updateValues, (updateError, updateResults) => {
@@ -2421,9 +2544,9 @@ app.post("/api/addsupplydelivery", (req, res) => {
         } else {
           // Insert into tblrawmatsinv using the new supDeliId
           const insertRawMatsInvQuery = `
-                        INSERT INTO tblrawmatsinv (supDeliId, quantity, lastUpdated) 
-                        VALUES (?, ?, NOW()) 
-                    `;
+                          INSERT INTO tblrawmatsinv (supDeliId, quantity, lastUpdated) 
+                          VALUES (?, ?, NOW()) 
+                      `;
           const insertRawMatsInvValues = [supDeliId, quantity];
 
           db.query(
@@ -2659,9 +2782,9 @@ app.post("/api/updateOrderDelivery", (req, res) => {
   // Step 1: Check if products array is empty, and if so, delete the order
   if (!products || products.length === 0) {
     const deleteOrderQuery = `
-      DELETE FROM tblordersfromsupplier 
-      WHERE orderId = ?
-    `;
+        DELETE FROM tblordersfromsupplier 
+        WHERE orderId = ?
+      `;
     db.query(deleteOrderQuery, [orderId], (err, result) => {
       if (err) {
         return res
@@ -2676,9 +2799,9 @@ app.post("/api/updateOrderDelivery", (req, res) => {
 
   // Step 2: Check if the orderId exists in tblordersfromsupplier and retrieve supplyId
   const checkOrderExistsQuery = `
-    SELECT supplyId FROM tblordersfromsupplier 
-    WHERE orderId = ?
-  `;
+      SELECT supplyId FROM tblordersfromsupplier 
+      WHERE orderId = ?
+    `;
   db.query(checkOrderExistsQuery, [orderId], (err, results) => {
     if (err) {
       return res
@@ -2696,11 +2819,11 @@ app.post("/api/updateOrderDelivery", (req, res) => {
 
     // Step 3: Validate products availability in tblorderfromsupplier_items for the given supplyId
     const checkAvailabilityQuery = `
-      SELECT oi.matId, oi.quantity, oi.totalCost
-      FROM tblorderfromsupplier_items oi
-      JOIN tblrawmats rm ON oi.matId = rm.matId
-      WHERE oi.orderId = ? 
-    `;
+        SELECT oi.matId, oi.quantity, oi.totalCost
+        FROM tblorderfromsupplier_items oi
+        JOIN tblrawmats rm ON oi.matId = rm.matId
+        WHERE oi.orderId = ? 
+      `;
     db.query(checkAvailabilityQuery, [orderId], (err, availableProducts) => {
       if (err) {
         return res.status(500).json({
@@ -2712,10 +2835,10 @@ app.post("/api/updateOrderDelivery", (req, res) => {
       // If no products are available, update status to 2
       if (availableProducts.length === 0) {
         const updateStatusQuery = `
-          UPDATE tblordersfromsupplier 
-          SET status = 2 
-          WHERE orderId = ?
-        `;
+            UPDATE tblordersfromsupplier 
+            SET status = 2 
+            WHERE orderId = ?
+          `;
         db.query(updateStatusQuery, [orderId], (err) => {
           if (err) {
             return res
@@ -2745,10 +2868,10 @@ app.post("/api/updateOrderDelivery", (req, res) => {
 
           // Step 5: Update the total cost in tblordersfromsupplier
           const updateOrderQuery = `
-            UPDATE tblordersfromsupplier 
-            SET totalCost = ? 
-            WHERE orderId = ?
-          `;
+              UPDATE tblordersfromsupplier 
+              SET totalCost = ? 
+              WHERE orderId = ?
+            `;
           connection.query(
             updateOrderQuery,
             [totalCost, orderId],
@@ -2764,9 +2887,9 @@ app.post("/api/updateOrderDelivery", (req, res) => {
               }
 
               const removeProductsQuery = `
-              DELETE FROM tblorderfromsupplier_items 
-              WHERE orderId = ?
-            `;
+                DELETE FROM tblorderfromsupplier_items 
+                WHERE orderId = ?
+              `;
               connection.query(removeProductsQuery, [orderId], (err) => {
                 if (err) {
                   return connection.rollback(() => {
@@ -2780,9 +2903,9 @@ app.post("/api/updateOrderDelivery", (req, res) => {
 
                 // Step 7: Insert new products into tblorderfromsupplier_items
                 const insertItemsQuery = `
-                INSERT INTO tblorderfromsupplier_items (orderId, matId, quantity, price, totalCost)
-                VALUES ?
-              `;
+                  INSERT INTO tblorderfromsupplier_items (orderId, matId, quantity, price, totalCost)
+                  VALUES ?
+                `;
                 const values = products.map((product) => [
                   orderId, // Order ID from tblordersfromsupplier
                   product.productId, // Material ID (matId)
@@ -2859,10 +2982,10 @@ app.put("/api/updateOrderDelivery/:id", (req, res) => {
 
       // Step 1: Update order in tblorders
       const updateOrderQuery = `
-        UPDATE tblordersfromsupplier 
-        SET supplyId = ?, totalCost = ?, status = 0 
-        WHERE orderId = ?
-      `;
+          UPDATE tblordersfromsupplier 
+          SET supplyId = ?, totalCost = ?, status = 0 
+          WHERE orderId = ?
+        `;
       connection.query(
         updateOrderQuery,
         [supplyId, totalCost, id],
@@ -2878,9 +3001,9 @@ app.put("/api/updateOrderDelivery/:id", (req, res) => {
 
           // Step 2: Delete existing items for the order
           const deleteItemsQuery = `
-          DELETE FROM tblorderfromsupplier_items 
-          WHERE orderId = ?
-        `;
+            DELETE FROM tblorderfromsupplier_items 
+            WHERE orderId = ?
+          `;
           connection.query(deleteItemsQuery, [id], (err, result) => {
             if (err) {
               return connection.rollback(() => {
@@ -2894,9 +3017,9 @@ app.put("/api/updateOrderDelivery/:id", (req, res) => {
 
             // Step 3: Insert updated items into tblorderfromsupplier_items
             const insertItemsQuery = `
-            INSERT INTO tblorderfromsupplier_items (orderId, matId, quantity, price, totalCost, status)
-            VALUES ?
-          `;
+              INSERT INTO tblorderfromsupplier_items (orderId, matId, quantity, price, totalCost, status)
+              VALUES ?
+            `;
             const values = products.map((product) => [
               id, // Existing Order ID
               product.productId, // Material ID (matId)
@@ -2968,29 +3091,29 @@ app.put("/api/updatesupplydelivery/:supDeliId", (req, res) => {
 
   // Query to get the original quantity of the supply delivery
   const getOriginalQuantityQuery = `
-        SELECT quantity FROM tblSupDeli WHERE supDeliId = ?;
-    `;
+          SELECT quantity FROM tblSupDeli WHERE supDeliId = ?;
+      `;
 
   // Query to update the supply delivery record in tblSupDeli
   const updateDeliveryQuery = `
-        UPDATE tblSupDeli 
-        SET supplyId = ?, matId = ?, quantity = ?, cost = ? 
-        WHERE supDeliId = ?;
-    `;
+          UPDATE tblSupDeli 
+          SET supplyId = ?, matId = ?, quantity = ?, cost = ? 
+          WHERE supDeliId = ?;
+      `;
 
   // Query to update the quantity of raw materials in tblRawMats
   const updateRawMatsQuery = `
-        UPDATE tblRawMats 
-        SET quantity = quantity + ? 
-        WHERE matId = ?;
-    `;
+          UPDATE tblrawmats 
+          SET quantity = quantity + ? 
+          WHERE matId = ?;
+      `;
 
   // Query to update the raw materials inventory in tblrawmatsinv
   const updateRawMatsInvQuery = `
-        UPDATE tblrawmatsinv
-        SET quantity = quantity + ?, lastupdated = NOW()
-        WHERE supDeliId = ?;
-    `;
+          UPDATE tblrawmatsinv
+          SET quantity = quantity + ?, lastupdated = NOW()
+          WHERE supDeliId = ?;
+      `;
 
   // Get the original quantity of the supply delivery to calculate the difference
   db.query(getOriginalQuantityQuery, [supDeliId], (error, results) => {
@@ -3058,24 +3181,23 @@ app.get("/api/inventory-data/:itemId", async (req, res) => {
   try {
     // Query to retrieve only the required inventory details for the specified itemId
     const query = `
-             SELECT 
-            p.*,
-          
-            i.itemName,
-            i.price,
-            i.quantity,
-            i.category,
-            i.description,
-            p.quantityProduced,
-            COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  -- Total quantity from tblproduction
-        FROM 
-            tblitems i
-        LEFT JOIN 
-            tblproduction p ON i.itemId = p.itemId  
-        WHERE i.itemId = ? AND p.production_status = 1	
-        GROUP BY 
-           p.productionId;  
-        `;
+              SELECT 
+              p.*,
+            
+              i.itemName,
+              i.price,
+              i.quantity,
+              i.category,
+              i.description,
+              COALESCE(SUM(p.actualQuantityProduced), 0) AS totalQuantity  -- Total quantity from tblproduction
+          FROM 
+              tblitems i
+          LEFT JOIN 
+              tblproduction p ON i.itemId = p.itemId  
+          WHERE i.itemId = ? AND p.production_status = 1	
+          GROUP BY 
+            p.productionId;  
+          `;
 
     db.query(query, [itemId], (error, results) => {
       if (error) {
@@ -3213,9 +3335,9 @@ app.put("/api/production/complete/:productionId", async (req, res) => {
       try {
         // Step 1: Fetch production details to validate
         const getProductionSql = `
-          SELECT productionId, itemId, quantityProduced, actualQuantityProduced
-          FROM tblproduction
-          WHERE productionId = ? AND production_status = 0;`;
+            SELECT productionId, itemId, quantityProduced, actualQuantityProduced
+            FROM tblproduction
+            WHERE productionId = ? AND production_status = 0;`;
 
         const [production] = await new Promise((resolve, reject) => {
           connection.query(getProductionSql, [productionId], (err, results) => {
@@ -3242,14 +3364,14 @@ app.put("/api/production/complete/:productionId", async (req, res) => {
 
         // Step 2: Update production status and actual quantity produced
         const updateProductionSql = `
-          UPDATE tblproduction
-          SET actualQuantityProduced = ?, production_status = 1
-          WHERE productionId = ?;`;
+            UPDATE tblproduction
+            SET actualQuantityProduced = ?, production_status = 1 , quantityProducedStorage = ?
+            WHERE productionId = ?;`;
 
         await new Promise((resolve, reject) => {
           connection.query(
             updateProductionSql,
-            [producedQuantity, productionId],
+            [producedQuantity, producedQuantity, productionId],
             (err) => {
               if (err) reject(err);
               resolve();
@@ -3259,9 +3381,9 @@ app.put("/api/production/complete/:productionId", async (req, res) => {
 
         // Step 3: Update item quantity
         const updateItemQuantitySql = `
-          UPDATE tblitems
-          SET quantity = quantity + ?
-          WHERE itemId = ?;`;
+            UPDATE tblitems
+            SET quantity = quantity + ?
+            WHERE itemId = ?;`;
 
         await new Promise((resolve, reject) => {
           connection.query(
@@ -3302,11 +3424,44 @@ app.put("/api/production/complete/:productionId", async (req, res) => {
 });
 
 app.get("/api/production", (req, res) => {
-  const query =
-    "SELECT pd.*, it.itemName FROM tblproduction pd LEFT JOIN tblitems it ON pd.itemId = it.itemId ORDER BY pd.production_status ASC;";
+  const query = `
+    SELECT pd.*, it.itemName 
+    FROM tblproduction pd 
+    LEFT JOIN tblitems it ON pd.itemId = it.itemId 
+    ORDER BY pd.production_status ASC;
+  `;
+
   db.query(query, (err, results) => {
     if (err) return res.status(500).send(err);
-    res.json(results);
+
+    // Use Promise.all to handle multiple async queries
+    const fetchMaterials = results.map((data) => {
+      return new Promise((resolve, reject) => {
+        const sql = `
+          SELECT pd.productionId, mu.quantityUsed, rm.matName, rm.category 
+          FROM tblproduction pd 
+          LEFT JOIN tblproductionmaterialused mu ON pd.productionId = mu.productionId 
+          LEFT JOIN tblorderfromsupplier_items odi ON mu.orderItemId = odi.orderItemId 
+          LEFT JOIN tblrawmats rm ON odi.matId = rm.matId 
+          WHERE pd.productionId = ?;
+        `;
+        db.query(sql, [data.productionId], (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ ...data, materials: result });
+          }
+        });
+      });
+    });
+
+    Promise.all(fetchMaterials)
+      .then((updatedResults) => {
+        res.json(updatedResults); // Send the updated data with materials
+      })
+      .catch((err) => {
+        res.status(500).send(err); // Handle any errors that occur during fetching materials
+      });
   });
 });
 
@@ -3342,13 +3497,13 @@ app.post("/api/produce", (req, res) => {
       try {
         // Step 1: Fetch required materials
         const getMaterialsSql = `
-          SELECT r.matId, r.matName, COALESCE(SUM(odi.remaining_quantity), 0) AS availableQuantity, 
-                odi.orderItemId, odi.remaining_quantity
-          FROM tblitem_ingredients i
-          LEFT JOIN tblorderfromsupplier_items odi ON i.matId = odi.matId
-          LEFT JOIN tblrawmats r ON i.matId = r.matId
-          WHERE i.itemId = ?
-          GROUP BY i.matId;`;
+            SELECT r.matId, r.matName, COALESCE(SUM(odi.remaining_quantity), 0) AS availableQuantity, 
+                  odi.orderItemId, odi.remaining_quantity
+            FROM tblitem_ingredients i
+            LEFT JOIN tblorderfromsupplier_items odi ON i.matId = odi.matId
+            LEFT JOIN tblrawmats r ON i.matId = r.matId
+            WHERE i.itemId = ?
+            GROUP BY i.matId;`;
 
         const materials = await new Promise((resolve, reject) => {
           connection.query(getMaterialsSql, [itemId], (err, results) => {
@@ -3395,10 +3550,10 @@ app.post("/api/produce", (req, res) => {
           let remainingToDeduct = material.usedQuantity;
 
           const orderItemsSql = `
-            SELECT orderItemId, remaining_quantity
-            FROM tblorderfromsupplier_items
-            WHERE matId = ? AND remaining_quantity > 0
-            ORDER BY orderItemId ASC;`;
+              SELECT orderItemId, remaining_quantity
+              FROM tblorderfromsupplier_items
+              WHERE matId = ? AND remaining_quantity > 0
+              ORDER BY orderItemId ASC;`;
 
           const orderItems = await new Promise((resolve, reject) => {
             connection.query(
@@ -3420,9 +3575,9 @@ app.post("/api/produce", (req, res) => {
             );
 
             const updateOrderItemSql = `
-              UPDATE tblorderfromsupplier_items
-              SET remaining_quantity = remaining_quantity - ?
-              WHERE orderItemId = ?;`;
+                UPDATE tblorderfromsupplier_items
+                SET remaining_quantity = remaining_quantity - ?
+                WHERE orderItemId = ?;`;
 
             await new Promise((resolve, reject) => {
               connection.query(
@@ -3447,9 +3602,9 @@ app.post("/api/produce", (req, res) => {
           }
 
           const updateRawMaterialSql = `
-            UPDATE tblrawmats
-            SET quantity = quantity - ?
-            WHERE matId = ?;`;
+              UPDATE tblrawmats
+              SET quantity = quantity - ?
+              WHERE matId = ?;`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -3465,8 +3620,8 @@ app.post("/api/produce", (req, res) => {
 
         // Step 3: Insert the production record
         const insertProductionSql = `
-          INSERT INTO tblproduction (itemId, quantityProduced, productionDate, staffName, production_status)
-          VALUES (?, ?, ?, ?, ?);`;
+            INSERT INTO tblproduction (itemId, quantityProduced, productionDate, staffName, production_status)
+            VALUES (?, ?, ?, ?, ?);`;
 
         const productionStatus = 0; // Assuming 1 means "produced"
         const insertProductionResult = await new Promise((resolve, reject) => {
@@ -3491,8 +3646,8 @@ app.post("/api/produce", (req, res) => {
         // Step 4: Insert records into tblproductionmaterialused for each material used
         for (const batch of materialBatchMappings) {
           const insertProductionMaterialUsedSql = `
-            INSERT INTO tblproductionmaterialused (productionId, orderItemId, quantityUsed)
-            VALUES (?, ?, ?);`;
+              INSERT INTO tblproductionmaterialused (productionId, orderItemId, quantityUsed)
+              VALUES (?, ?, ?);`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -3515,13 +3670,13 @@ app.post("/api/produce", (req, res) => {
           .join(", ");
 
         const insertMaterialLogSql = `
-          INSERT INTO tblproductionmateriallogs (dateLogged, description)
-          VALUES (?, ?);`;
+            INSERT INTO tblproductionmateriallogs (dateLogged, description , productionId)
+            VALUES (?, ? , ?);`;
 
         await new Promise((resolve, reject) => {
           connection.query(
             insertMaterialLogSql,
-            [productionDate, materialLogDescription],
+            [productionDate, materialLogDescription, productionId],
             (err) => {
               if (err) reject(err);
               resolve();
@@ -3777,8 +3932,8 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
       try {
         // Step 1: Fetch old production details (old quantity and itemId)
         const getOldProductionSql = `
-          SELECT quantityProduced, itemId , productionId 
-          FROM tblproduction WHERE productionId = ?;`;
+            SELECT quantityProduced, itemId , productionId 
+            FROM tblproduction WHERE productionId = ?;`;
         const oldProduction = await new Promise((resolve, reject) => {
           connection.query(
             getOldProductionSql,
@@ -3816,11 +3971,11 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
 
         // Step 2: Get materials used for the production
         const getUsedMaterialsSql = `
-          SELECT pdu.productionMatId , odi.orderItemId , odi.matId, pdu.quantityUsed, mat.matName 
-          FROM tblproductionmaterialused pdu 
-          LEFT JOIN tblorderfromsupplier_items odi ON pdu.orderItemId = odi.orderItemId 
-          LEFT JOIN tblrawmats mat ON mat.matId = odi.matId  
-          WHERE productionId = ?;`;
+            SELECT pdu.productionMatId , odi.orderItemId , odi.matId, pdu.quantityUsed, mat.matName 
+            FROM tblproductionmaterialused pdu 
+            LEFT JOIN tblorderfromsupplier_items odi ON pdu.orderItemId = odi.orderItemId 
+            LEFT JOIN tblrawmats mat ON mat.matId = odi.matId  
+            WHERE productionId = ?;`;
 
         const usedMaterials = await new Promise((resolve, reject) => {
           connection.query(
@@ -3836,9 +3991,9 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
         console.log("usedmaterial === >", usedMaterials);
         for (const material of usedMaterials) {
           const revertMaterialSql = `
-            UPDATE tblorderfromsupplier_items 
-            SET remaining_quantity = remaining_quantity + ? 
-            WHERE orderItemId = ?;`;
+              UPDATE tblorderfromsupplier_items 
+              SET remaining_quantity = remaining_quantity + ? 
+              WHERE orderItemId = ?;`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -3852,7 +4007,7 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
           });
 
           const deleteMaterialSql = `
-            DELETE FROM tblproductionmaterialused WHERE productionMatId = ?;`;
+              DELETE FROM tblproductionmaterialused WHERE productionMatId = ?;`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -3867,8 +4022,8 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
 
           const materialLogDescription = `Reverted ${material.quantityUsed} units of material: ${material.matName}`;
           const insertMaterialLogSql = `
-            INSERT INTO tblproductionmateriallogs (dateLogged, description) 
-            VALUES (?, ?);`;
+              INSERT INTO tblproductionmateriallogs (dateLogged, description) 
+              VALUES (?, ?);`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -3884,13 +4039,13 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
 
         // Step 3: Validate if the new production has enough materials
         const getMaterialsSql = `
-          SELECT r.matId, r.matName, COALESCE(SUM(odi.remaining_quantity), 0) AS availableQuantity, 
-          odi.orderItemId, odi.remaining_quantity 
-          FROM tblitem_ingredients i
-          LEFT JOIN tblorderfromsupplier_items odi ON i.matId = odi.matId
-          LEFT JOIN tblrawmats r ON i.matId = r.matId
-          WHERE i.itemId = ?
-          GROUP BY i.matId;`;
+            SELECT r.matId, r.matName, COALESCE(SUM(odi.remaining_quantity), 0) AS availableQuantity, 
+            odi.orderItemId, odi.remaining_quantity 
+            FROM tblitem_ingredients i
+            LEFT JOIN tblorderfromsupplier_items odi ON i.matId = odi.matId
+            LEFT JOIN tblrawmats r ON i.matId = r.matId
+            WHERE i.itemId = ?
+            GROUP BY i.matId;`;
 
         const materials = await new Promise((resolve, reject) => {
           connection.query(getMaterialsSql, [itemId], (err, results) => {
@@ -3936,10 +4091,10 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
           let remainingToDeduct = material.usedQuantity;
 
           const orderItemsSql = `
-            SELECT orderItemId, remaining_quantity
-            FROM tblorderfromsupplier_items
-            WHERE matId = ? AND remaining_quantity > 0
-            ORDER BY orderItemId ASC;`;
+              SELECT orderItemId, remaining_quantity
+              FROM tblorderfromsupplier_items
+              WHERE matId = ? AND remaining_quantity > 0
+              ORDER BY orderItemId ASC;`;
 
           const orderItems = await new Promise((resolve, reject) => {
             connection.query(
@@ -3961,9 +4116,9 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
             );
 
             const updateOrderItemSql = `
-              UPDATE tblorderfromsupplier_items
-              SET remaining_quantity = remaining_quantity - ?
-              WHERE orderItemId = ?;`;
+                UPDATE tblorderfromsupplier_items
+                SET remaining_quantity = remaining_quantity - ?
+                WHERE orderItemId = ?;`;
 
             await new Promise((resolve, reject) => {
               connection.query(
@@ -3988,9 +4143,9 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
           }
 
           const updateRawMaterialSql = `
-            UPDATE tblrawmats
-            SET quantity = quantity - ?
-            WHERE matId = ?;`;
+              UPDATE tblrawmats
+              SET quantity = quantity - ?
+              WHERE matId = ?;`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -4006,9 +4161,9 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
 
         // Step 4: Update the production record
         const updateProductionSql = `
-          UPDATE tblproduction
-          SET itemId = ?, quantityProduced = ?, staffName = ?
-          WHERE productionId = ?;`;
+            UPDATE tblproduction
+            SET itemId = ?, quantityProduced = ?, staffName = ?
+            WHERE productionId = ?;`;
 
         await new Promise((resolve, reject) => {
           connection.query(
@@ -4024,8 +4179,8 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
         // Insert records into tblproductionmaterialused for each material used
         for (const batch of materialBatchMappings) {
           const insertProductionMaterialUsedSql = `
-            INSERT INTO tblproductionmaterialused (productionId, orderItemId, quantityUsed)
-            VALUES (?, ?, ?);`;
+              INSERT INTO tblproductionmaterialused (productionId, orderItemId, quantityUsed)
+              VALUES (?, ?, ?);`;
 
           await new Promise((resolve, reject) => {
             connection.query(
@@ -4048,8 +4203,8 @@ app.put("/api/updateProduction/:productionId", (req, res) => {
           .join(", ");
 
         const insertMaterialLogSql = `
-          INSERT INTO tblproductionmateriallogs (dateLogged, description)
-          VALUES (?, ?);`;
+            INSERT INTO tblproductionmateriallogs (dateLogged, description)
+            VALUES (?, ?);`;
 
         await new Promise((resolve, reject) => {
           connection.query(
@@ -4112,9 +4267,9 @@ app.delete("/api/production/:id", async (req, res) => {
       try {
         // Step 1: Verify production exists and check `production_status`
         const getProductionSql = `
-          SELECT productionId, itemId, quantityProduced, production_status
-          FROM tblproduction
-          WHERE productionId = ?;`;
+            SELECT productionId, itemId, quantityProduced, production_status
+            FROM tblproduction
+            WHERE productionId = ?;`;
 
         const productionResult = await new Promise((resolve, reject) => {
           connection.query(getProductionSql, [id], (err, results) => {
@@ -4142,9 +4297,9 @@ app.delete("/api/production/:id", async (req, res) => {
 
         // Step 2: Get material usage details from tblproductionmaterialused
         const getUsedMaterialsSql = `
-          SELECT orderItemId, quantityUsed
-          FROM tblproductionmaterialused
-          WHERE productionId = ?;`;
+            SELECT orderItemId, quantityUsed
+            FROM tblproductionmaterialused
+            WHERE productionId = ?;`;
 
         const usedMaterials = await new Promise((resolve, reject) => {
           connection.query(getUsedMaterialsSql, [id], (err, results) => {
@@ -4158,9 +4313,9 @@ app.delete("/api/production/:id", async (req, res) => {
 
         // Step 3: Reverse `remaining_quantity` for each material batch
         const updateOrderItemSql = `
-          UPDATE tblorderfromsupplier_items
-          SET remaining_quantity = remaining_quantity + ?
-          WHERE orderItemId = ?;`; // Adding a check for valid remaining quantity
+            UPDATE tblorderfromsupplier_items
+            SET remaining_quantity = remaining_quantity + ?
+            WHERE orderItemId = ?;`; // Adding a check for valid remaining quantity
 
         for (const material of usedMaterials) {
           const { orderItemId, quantityUsed } = material;
@@ -4189,8 +4344,8 @@ app.delete("/api/production/:id", async (req, res) => {
 
         // Step 4: Delete material usage records from `tblproductionmaterialused`
         const deleteUsedMaterialsSql = `
-          DELETE FROM tblproductionmaterialused
-          WHERE productionId = ?;`;
+            DELETE FROM tblproductionmaterialused
+            WHERE productionId = ?;`;
 
         await new Promise((resolve, reject) => {
           connection.query(deleteUsedMaterialsSql, [id], (err) => {
@@ -4201,8 +4356,8 @@ app.delete("/api/production/:id", async (req, res) => {
 
         // Step 6: Delete production record from `tblproduction`
         const deleteProductionSql = `
-          DELETE FROM tblproduction
-          WHERE productionId = ?;`;
+            DELETE FROM tblproduction
+            WHERE productionId = ?;`;
 
         await new Promise((resolve, reject) => {
           connection.query(deleteProductionSql, [id], (err) => {
@@ -4270,29 +4425,29 @@ app.delete("/api/production/:id", async (req, res) => {
 // Route to get all orders with product details
 app.get("/api/orders", (req, res) => {
   const query = `
-        SELECT 
-            o.orderId, 
-            o.customerName, 
-            o.date, 
-            o.location, 
-            o.modeOfPayment, 
-            o.paymentStatus, 
-            o.status, 
-            o.price, 
-            o.quantity as OrderedQuantities,
-            GROUP_CONCAT(i.itemName SEPARATOR ', ') AS itemNames,
-            GROUP_CONCAT(i.quantity SEPARATOR ', ') AS remainingQuantities
-          
-        FROM 
-            tblorders AS o
-        LEFT JOIN 
-            tblitems AS i ON o.itemId = i.itemId
-        GROUP BY 
-            o.orderId
-        ORDER BY 
-            o.date DESC;
+          SELECT 
+              o.orderId, 
+              o.customerName, 
+              o.date, 
+              o.location, 
+              o.modeOfPayment, 
+              o.paymentStatus, 
+              o.status, 
+              o.price, 
+              o.quantity as OrderedQuantities,
+              GROUP_CONCAT(i.itemName SEPARATOR ', ') AS itemNames,
+              GROUP_CONCAT(i.quantity SEPARATOR ', ') AS remainingQuantities
+            
+          FROM 
+              tblorders AS o
+          LEFT JOIN 
+              tblitems AS i ON o.itemId = i.itemId
+          GROUP BY 
+              o.orderId
+          ORDER BY 
+              o.date DESC;
 
-    `;
+      `;
 
   db.query(query, (err, results) => {
     if (err) {
@@ -4336,9 +4491,9 @@ app.post("/api/orders", (req, res) => {
 
   // 1. Insert the order into tblorders
   const orderQuery = `
-        INSERT INTO tblorders (customerName, date, price, status, lastUpdateDate, location, paymentStatus, modeOfPayment)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+          INSERT INTO tblorders (customerName, date, price, status, lastUpdateDate, location, paymentStatus, modeOfPayment)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
 
   const orderData = [
     customerName,
@@ -4362,9 +4517,9 @@ app.post("/api/orders", (req, res) => {
 
     // 2. Insert each product with inventoryId into tblorderproducts
     const orderProductsQuery = `
-            INSERT INTO tblorderproducts (orderId, itemId, quantity, inventoryId)
-            VALUES ?
-        `;
+              INSERT INTO tblorderproducts (orderId, itemId, quantity, inventoryId)
+              VALUES ?
+          `;
 
     const orderProductsData = orderProducts.map((product) => [
       orderId, // The orderId we just inserted
@@ -4418,10 +4573,10 @@ app.put("/api/orders/:orderId", (req, res) => {
 
   // 1. Update the order details in tblorders
   const updateOrderQuery = `
-        UPDATE tblorders 
-        SET customerName = ?, date = ?, price = ?, status = ?, lastUpdateDate = ?, 
-            location = ?, paymentStatus = ?, modeOfPayment = ? 
-        WHERE orderId = ?`;
+          UPDATE tblorders 
+          SET customerName = ?, date = ?, price = ?, status = ?, lastUpdateDate = ?, 
+              location = ?, paymentStatus = ?, modeOfPayment = ? 
+          WHERE orderId = ?`;
 
   const updateOrderData = [
     customerName,
@@ -4514,10 +4669,10 @@ app.put("/api/orders/:orderId", (req, res) => {
 
   // SQL query to update an order with the provided details
   const query = `
-        UPDATE tblorders 
-        SET itemId = ?, customerName = ?, date = ?, location = ?, modeOfPayment = ?, 
-            paymentStatus = ?, price = ?, quantity = ?, status = ?
-        WHERE orderId = ?`;
+          UPDATE tblorders 
+          SET itemId = ?, customerName = ?, date = ?, location = ?, modeOfPayment = ?, 
+              paymentStatus = ?, price = ?, quantity = ?, status = ?
+          WHERE orderId = ?`;
 
   db.query(
     query,
@@ -4657,23 +4812,24 @@ app.delete("/api/orders/:id", (req, res) => {
 // Fetch production material logs
 app.get("/api/production-material-logs", (req, res) => {
   const query = `
-        SELECT 
-            logs.logId, 
-            logs.dateLogged, 
-            logs.description, 
-            GROUP_CONCAT(mats.matName SEPARATOR ', ') AS matNames,
-            GROUP_CONCAT(logMats.quantity SEPARATOR ', ') AS quantities
-           
-        FROM 
-            tblproductionmateriallogs logs
-        LEFT JOIN 
-            tblmatlogsmats logMats ON logs.logId = logMats.logId
-        LEFT JOIN 
-            tblrawmats mats ON logMats.matId = mats.matId
-        GROUP BY 
-            logs.logId
-          ORDER BY logs.logId DESC;
-    `;
+          SELECT 
+              logs.logId, 
+              logs.dateLogged, 
+              logs.description, 
+              logs.productionId,
+              GROUP_CONCAT(mats.matName SEPARATOR ', ') AS matNames,
+              GROUP_CONCAT(logMats.quantity SEPARATOR ', ') AS quantities
+            
+          FROM 
+              tblproductionmateriallogs logs
+          LEFT JOIN 
+              tblmatlogsmats logMats ON logs.logId = logMats.logId
+          LEFT JOIN 
+              tblrawmats mats ON logMats.matId = mats.matId
+          GROUP BY 
+              logs.logId
+            ORDER BY logs.logId DESC;
+      `;
 
   db.query(query, (error, results) => {
     if (error) {
@@ -4713,11 +4869,11 @@ app.post("/api/addproductionlog", async (req, res) => {
 
         if (validMaterials.length > 0) {
           const materialLogQuery = `
-                        INSERT INTO tblmatlogsmats (logId, matId, inventoryId, quantity) 
-                        VALUES ${validMaterials
-                          .map(() => "(?, ?, ?, ?)")
-                          .join(", ")}
-                    `;
+                          INSERT INTO tblmatlogsmats (logId, matId, inventoryId, quantity) 
+                          VALUES ${validMaterials
+                            .map(() => "(?, ?, ?, ?)")
+                            .join(", ")}
+                      `;
           const materialLogValues = validMaterials.flatMap((m) => [
             newLogId,
             m.materialId,
@@ -4736,10 +4892,10 @@ app.post("/api/addproductionlog", async (req, res) => {
               return new Promise((resolve, reject) => {
                 // Update tblrawmatsinv
                 const updateRawMatInvQuery = `
-                                    UPDATE tblrawmatsinv
-                                    SET quantity = quantity - ?
-                                    WHERE inventoryId = ? AND quantity >= ?
-                                `;
+                                      UPDATE tblrawmatsinv
+                                      SET quantity = quantity - ?
+                                      WHERE inventoryId = ? AND quantity >= ?
+                                  `;
                 const updateRawMatInvValues = [
                   material.quantity,
                   material.inventoryId,
@@ -4769,10 +4925,10 @@ app.post("/api/addproductionlog", async (req, res) => {
 
                     // Update tblrawmats based on matId
                     const updateRawMatQuery = `
-                                        UPDATE tblrawmats
-                                        SET quantity = quantity - ?
-                                        WHERE matId = ? AND quantity >= ?
-                                    `;
+                                          UPDATE tblrawmats
+                                          SET quantity = quantity - ?
+                                          WHERE matId = ? AND quantity >= ?
+                                      `;
                     const updateRawMatValues = [
                       material.quantity,
                       material.materialId,
@@ -4872,9 +5028,9 @@ app.post("/api/updateproductionlog", async (req, res) => {
         ({ matId, quantity }) => {
           return new Promise((resolve, reject) => {
             const addOldQuantityQuery = `
-                        UPDATE tblrawmats
-                        SET quantity = quantity + ?
-                        WHERE matId = ?`;
+                          UPDATE tblrawmats
+                          SET quantity = quantity + ?
+                          WHERE matId = ?`;
             db.query(addOldQuantityQuery, [quantity, matId], (error) => {
               if (error) return reject(error);
               resolve();
@@ -4888,9 +5044,9 @@ app.post("/api/updateproductionlog", async (req, res) => {
         ({ inventoryId, quantity }) => {
           return new Promise((resolve, reject) => {
             const addOldQuantityToInvQuery = `
-                        UPDATE tblrawmatsinv
-                        SET quantity = quantity + ?
-                        WHERE inventoryId = ?`;
+                          UPDATE tblrawmatsinv
+                          SET quantity = quantity + ?
+                          WHERE inventoryId = ?`;
             db.query(
               addOldQuantityToInvQuery,
               [quantity, inventoryId],
@@ -4921,10 +5077,10 @@ app.post("/api/updateproductionlog", async (req, res) => {
               );
               if (validMaterials.length > 0) {
                 const materialLogQuery = `
-                                    INSERT INTO tblmatlogsmats (logId, matId, quantity, inventoryId)
-                                    VALUES ${validMaterials
-                                      .map(() => "(?, ?, ?, ?)")
-                                      .join(", ")}`;
+                                      INSERT INTO tblmatlogsmats (logId, matId, quantity, inventoryId)
+                                      VALUES ${validMaterials
+                                        .map(() => "(?, ?, ?, ?)")
+                                        .join(", ")}`;
                 const materialLogValues = validMaterials.flatMap((m) => [
                   logId,
                   m.matId,
@@ -4946,9 +5102,9 @@ app.post("/api/updateproductionlog", async (req, res) => {
                     ({ matId, quantity }) => {
                       return new Promise((resolve, reject) => {
                         const subtractNewQuantityQuery = `
-                                                UPDATE tblrawmats
-                                                SET quantity = quantity - ?
-                                                WHERE matId = ?`;
+                                                  UPDATE tblrawmats
+                                                  SET quantity = quantity - ?
+                                                  WHERE matId = ?`;
                         db.query(
                           subtractNewQuantityQuery,
                           [quantity, matId],
@@ -4966,9 +5122,9 @@ app.post("/api/updateproductionlog", async (req, res) => {
                     ({ inventoryId, quantity }) => {
                       return new Promise((resolve, reject) => {
                         const subtractNewQuantityFromInvQuery = `
-                                                UPDATE tblrawmatsinv
-                                                SET quantity = quantity - ?
-                                                WHERE inventoryId = ?`;
+                                                  UPDATE tblrawmatsinv
+                                                  SET quantity = quantity - ?
+                                                  WHERE inventoryId = ?`;
                         db.query(
                           subtractNewQuantityFromInvQuery,
                           [quantity, inventoryId],
@@ -5041,9 +5197,9 @@ app.delete("/api/deletemateriallog/:logId", async (req, res) => {
       ({ matId, quantity }) =>
         new Promise((resolve, reject) => {
           const updateRawMatQuery = `
-                UPDATE tblrawmats
-                SET quantity = quantity + ?
-                WHERE matId = ?`;
+                  UPDATE tblrawmats
+                  SET quantity = quantity + ?
+                  WHERE matId = ?`;
           db.query(updateRawMatQuery, [quantity, matId], (error) => {
             if (error) return reject(error);
             resolve();
@@ -5056,9 +5212,9 @@ app.delete("/api/deletemateriallog/:logId", async (req, res) => {
       ({ inventoryId, quantity }) =>
         new Promise((resolve, reject) => {
           const updateRawMatInvQuery = `
-                UPDATE tblrawmatsinv
-                SET quantity = quantity + ?
-                WHERE inventoryId = ?`;
+                  UPDATE tblrawmatsinv
+                  SET quantity = quantity + ?
+                  WHERE inventoryId = ?`;
           db.query(updateRawMatInvQuery, [quantity, inventoryId], (error) => {
             if (error) return reject(error);
             resolve();
@@ -5106,76 +5262,76 @@ app.get("/api/sales/summary", (req, res) => {
   if (range === "week") {
     // Query for "This Week" range
     query = `
-            SELECT 
-                WEEKDAY(date) AS day_of_week,  -- 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
-                COUNT(*) AS order_count
-            FROM 
-                tblorders
-            WHERE 
-                status = "delivered" 
-                AND date >= CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY  -- Start from the most recent Monday
-                AND date < CURDATE() + INTERVAL (7 - WEEKDAY(CURDATE())) DAY  -- Extend to the upcoming Sunday (inclusive)
-            GROUP BY 
-                WEEKDAY(date)
-            ORDER BY 
-                WEEKDAY(date);
+              SELECT 
+                  WEEKDAY(date) AS day_of_week,  -- 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+                  COUNT(*) AS order_count
+              FROM 
+                  tblorders
+              WHERE 
+                  status = "delivered" 
+                  AND date >= CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY  -- Start from the most recent Monday
+                  AND date < CURDATE() + INTERVAL (7 - WEEKDAY(CURDATE())) DAY  -- Extend to the upcoming Sunday (inclusive)
+              GROUP BY 
+                  WEEKDAY(date)
+              ORDER BY 
+                  WEEKDAY(date);
 
-        `;
+          `;
   }
 
   if (range === "month") {
     // Query for "This Month" range
     query = `
-            SELECT 
-                DAY(date) AS day_of_month,  -- Get the day of the month
-                COUNT(*) AS order_count
-            FROM 
-                tblorders
-            WHERE 
-                status = "delivered" 
-                AND MONTH(date) = MONTH(CURDATE()) 
-                AND YEAR(date) = YEAR(CURDATE())
-            GROUP BY 
-                DAY(date)
-            ORDER BY 
-                DAY(date);
-        `;
+              SELECT 
+                  DAY(date) AS day_of_month,  -- Get the day of the month
+                  COUNT(*) AS order_count
+              FROM 
+                  tblorders
+              WHERE 
+                  status = "delivered" 
+                  AND MONTH(date) = MONTH(CURDATE()) 
+                  AND YEAR(date) = YEAR(CURDATE())
+              GROUP BY 
+                  DAY(date)
+              ORDER BY 
+                  DAY(date);
+          `;
   }
 
   if (range === "year") {
     // Query for "This Year" range
     query = `
-            SELECT 
-                MONTH(date) AS month_of_year,  -- Get the month of the year
-                COUNT(*) AS order_count
-            FROM 
-                tblorders
-            WHERE 
-                status = "delivered" 
-                AND YEAR(date) = YEAR(CURDATE())
-            GROUP BY 
-                MONTH(date)
-            ORDER BY 
-                MONTH(date);
-        `;
+              SELECT 
+                  MONTH(date) AS month_of_year,  -- Get the month of the year
+                  COUNT(*) AS order_count
+              FROM 
+                  tblorders
+              WHERE 
+                  status = "delivered" 
+                  AND YEAR(date) = YEAR(CURDATE())
+              GROUP BY 
+                  MONTH(date)
+              ORDER BY 
+                  MONTH(date);
+          `;
   }
 
   if (range === "custom") {
     // Query for custom date range
     query = `
-            SELECT 
-                DAY(date) AS day_of_month,  -- Get the day of the month
-                COUNT(*) AS order_count
-            FROM 
-                tblorders
-            WHERE 
-                status = "delivered" 
-                AND DATE(date) BETWEEN ? AND ?
-            GROUP BY 
-                DAY(date)
-            ORDER BY 
-                DAY(date);
-        `;
+              SELECT 
+                  DAY(date) AS day_of_month,  -- Get the day of the month
+                  COUNT(*) AS order_count
+              FROM 
+                  tblorders
+              WHERE 
+                  status = "delivered" 
+                  AND DATE(date) BETWEEN ? AND ?
+              GROUP BY 
+                  DAY(date)
+              ORDER BY 
+                  DAY(date);
+          `;
     queryParams = [startDate, endDate]; // Add startDate and endDate to query parameters
   }
 
@@ -5190,18 +5346,45 @@ app.get("/api/sales/summary", (req, res) => {
     res.json(results);
   });
 });
-
 /*
-SALES
-*/
+  SALES
+  */ /*
+ */
 
-//FETCH PENDING ORDERS  with specific product per order (product object)
-app.get("/api/pending_Orders/", (req, res) => {
+// ** DASHBOARD ** //
+app.get("/api/sales/current-year", (req, res) => {
+  const query = `
+    SELECT MONTH(STR_TO_DATE(SUBSTRING_INDEX(time_return, ' ', 1), '%m-%d-%Y')) 
+    AS month, SUM(total_sum_price) AS total_sales 
+    FROM ( SELECT DISTINCT order_id, total_sum_price, time_return FROM tblsales ) 
+    AS distinct_sales WHERE YEAR(STR_TO_DATE(SUBSTRING_INDEX(time_return, ' ', 1), '%m-%d-%Y')) = YEAR(CURDATE()) 
+    GROUP BY MONTH(STR_TO_DATE(SUBSTRING_INDEX(time_return, ' ', 1), '%m-%d-%Y')) 
+    ORDER BY MONTH(STR_TO_DATE(SUBSTRING_INDEX(time_return, ' ', 1), '%m-%d-%Y'));
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching sales data:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+
+    // Prepare response with all months (default 0 for missing months)
+    const salesData = Array(12).fill(0); // 12 months, all initialized to 0
+    results.forEach((row) => {
+      salesData[row.month - 1] = row.total_sales;
+    });
+
+    res.json(salesData);
+  });
+});
+
+app.get("/api/sales_dashboard/", (req, res) => {
   const sql = `SELECT DISTINCT *
-               FROM tblorders_customer 
-               WHERE status = "PENDING" 
-               GROUP BY order_id
-               ORDER BY date DESC, order_id DESC;`;
+                FROM tblsales
+                GROUP BY order_id
+                ORDER BY time_return DESC, order_id DESC
+                LIMIT 10;
+                `;
 
   db.query(sql, (err, result) => {
     if (err) {
@@ -5213,8 +5396,8 @@ app.get("/api/pending_Orders/", (req, res) => {
 
     if (!result || result.length === 0) {
       return res
-        .status(404)
-        .json({ status: "error", res: "No pending orders found." });
+        .status(200)
+        .json({ status: "success", res: "No preparing orders found." });
     }
 
     const orders = [];
@@ -5223,9 +5406,151 @@ app.get("/api/pending_Orders/", (req, res) => {
     const fetchProductsForOrder = (order) => {
       return new Promise((resolve, reject) => {
         const productSql = `SELECT *
-                            FROM tblorders_customer 
-                            WHERE order_id = ? 
-                            ORDER BY order_id DESC;`;
+                              FROM tblsales 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
+
+        db.query(productSql, [order.order_id], (err, products) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve({ ...order, products });
+        });
+      });
+    };
+
+    const fetchAllOrders = async () => {
+      try {
+        const ordersWithProducts = await Promise.all(
+          result.map((order) => fetchProductsForOrder(order))
+        );
+
+        return res
+          .status(200)
+          .json({ status: "success", res: ordersWithProducts });
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+    };
+
+    fetchAllOrders();
+  });
+});
+
+app.get("/api/sales_today/", (req, res) => {
+  const sql = `SELECT 
+              SUM(total_sum_price) AS daily_total_sales
+              FROM (
+                  SELECT 
+                      order_id, 
+                      total_sum_price
+                  FROM tblsales
+                  WHERE DATE(STR_TO_DATE(time_return, '%m-%d-%Y %H:%i')) = CURDATE()
+                  GROUP BY order_id
+              ) AS distinct_orders;
+                `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", message: "No sales today." });
+    }
+
+    // Assuming the result contains a column `daily_total_sales`
+    const dailyTotalSales = result[0].daily_total_sales;
+
+    return res.status(200).json({
+      status: "success",
+      daily_total_sales: dailyTotalSales,
+    });
+  });
+});
+
+app.get("/api/sales_month/", (req, res) => {
+  const sql = `SELECT 
+              SUM(total_sum_price) AS monthly_total_sales
+          FROM (
+              SELECT 
+                  order_id, 
+                  total_sum_price
+              FROM tblsales
+              WHERE DATE_FORMAT(STR_TO_DATE(time_return, '%m-%d-%Y %H:%i'), '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+              GROUP BY order_id
+          ) AS distinct_orders;
+                `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", message: "No sales today." });
+    }
+
+    console.log(result);
+
+    // Assuming the result contains a column `monthly_total_sales`
+    const thisMonthTotalSales = result[0].monthly_total_sales;
+
+    return res.status(200).json({
+      status: "success",
+      thisMonth_total_sales: thisMonthTotalSales,
+    });
+  });
+});
+
+// ** DASHBOARD ** //
+
+//** ORDERS **/
+
+//FETCH PENDING ORDERS  with specific product per order (product object)
+app.get("/api/pending_Orders/", (req, res) => {
+  const sql = `SELECT DISTINCT *
+                FROM tblorders_customer 
+                WHERE status = "PENDING" 
+                GROUP BY order_id
+                ORDER BY date DESC, order_id DESC;`;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", res: "No pending orders found." });
+    }
+
+    const orders = [];
+
+    // Use async function inside a loop to handle multiple queries
+    const fetchProductsForOrder = (order) => {
+      return new Promise((resolve, reject) => {
+        const productSql = `SELECT *
+                              FROM tblorders_customer 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
 
         db.query(productSql, [order.order_id], (err, products) => {
           if (err) {
@@ -5257,12 +5582,172 @@ app.get("/api/pending_Orders/", (req, res) => {
   });
 });
 //for updating status to PREPARING
+//
+
 app.post("/api/status_preparing/", async (req, res) => {
   const { orderId } = req.body;
-  console.log(orderId);
+  console.log("Order ID: ", orderId);
+
   try {
-    const query = `UPDATE tblorders_customer SET status = "Preparing" WHERE order_id = ?`;
-    await db.query(query, [orderId], (err, result) => {
+    // Step 1: Check if order quantities are valid
+    const checkQuery = `
+      SELECT 
+          oc.itemId AS itemId,
+          i.itemName AS item_name,
+          oc.quantity AS order_quantity,
+          i.quantity AS item_quantity,
+          CASE
+              WHEN oc.quantity > i.quantity THEN '0'
+              ELSE '1'
+          END AS comparison_result
+      FROM tblorders_customer oc
+      JOIN tblitems i ON oc.itemId = i.itemId
+      WHERE oc.order_id = ?;
+    `;
+
+    db.query(checkQuery, [orderId], async (err, rows) => {
+      if (err) {
+        console.error("Error checking item quantities:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+
+      // Step 2: Check if any item has insufficient stock (comparison_result = '0')
+      const invalidItem = rows.find((row) => row.comparison_result === "0");
+      if (invalidItem) {
+        return res.status(400).json({
+          message: `Insufficient stock: ${invalidItem.item_name} <br>Available Stock Now: ${invalidItem.item_quantity} <br>Customer Ordered: ${invalidItem.order_quantity}`,
+        });
+      }
+
+      // Function to deduct from tblproduction
+      const deductFromProduction = async (item) => {
+        let remainingQuantity = item.order_quantity;
+
+        while (remainingQuantity > 0) {
+          const selectProductionQuery = `
+            SELECT productionId, actualQuantityProduced
+            FROM tblproduction
+            WHERE itemId = ?
+            AND actualQuantityProduced > 0
+            ORDER BY productionId ASC
+            LIMIT 1;
+          `;
+
+          const productionRow = await new Promise((resolve, reject) => {
+            db.query(selectProductionQuery, [item.itemId], (err, rows) => {
+              if (err) return reject(err);
+              resolve(rows[0]); // Get the first row
+            });
+          });
+
+          if (!productionRow) {
+            console.warn(
+              `No production record available to deduct for item ${item.item_name}`
+            );
+            break; // No more rows to deduct from
+          }
+
+          const { productionId, actualQuantityProduced } = productionRow;
+
+          // Determine deduction amount
+          const deduction = Math.min(remainingQuantity, actualQuantityProduced);
+          remainingQuantity -= deduction;
+
+          const updateProductionQuery = `
+            UPDATE tblproduction
+            SET actualQuantityProduced = actualQuantityProduced - ?
+            WHERE productionId = ?;
+          `;
+
+          await new Promise((resolve, reject) => {
+            db.query(
+              updateProductionQuery,
+              [deduction, productionId],
+              (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+              }
+            );
+          });
+
+          console.log(
+            `Deducted ${deduction} from productionId ${productionId}, remaining quantity: ${remainingQuantity}`
+          );
+        }
+
+        if (remainingQuantity > 0) {
+          console.warn(
+            `Order quantity exceeds available production for item ${item.item_name}`
+          );
+          throw new Error(
+            `Insufficient production for item ${item.item_name}, remaining quantity: ${remainingQuantity}`
+          );
+        }
+      };
+
+      // Step 3: Deduct quantities from tblitems and tblproduction
+      const deductPromises = rows.map(async (item) => {
+        // Deduct from tblitems
+        const updateStockQuery = `
+          UPDATE tblitems
+          SET quantity = quantity - ?
+          WHERE itemId = ?;
+        `;
+
+        await new Promise((resolve, reject) => {
+          db.query(
+            updateStockQuery,
+            [item.order_quantity, item.itemId],
+            (err) => {
+              if (err) return reject(err);
+              resolve();
+            }
+          );
+        });
+
+        // Deduct from tblproduction
+        await deductFromProduction(item);
+      });
+
+      try {
+        await Promise.all(deductPromises);
+
+        // Step 4: Update the order status to "Preparing"
+        const updateOrderQuery = `
+          UPDATE tblorders_customer 
+          SET status = "Preparing" 
+          WHERE order_id = ?;
+        `;
+
+        db.query(updateOrderQuery, [orderId], (err, result) => {
+          if (err) {
+            console.error("Error updating order status:", err);
+            return res.status(500).json({ message: "Internal server error" });
+          }
+
+          return res.status(200).json({
+            status: "success",
+            message: "Order set to Preparing and stock updated.",
+          });
+        });
+      } catch (err) {
+        console.error("Error during stock and production deduction:", err);
+        return res
+          .status(500)
+          .json({ message: "Internal server error during stock update." });
+      }
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    res.status(500).json({ message: "Unexpected error occurred." });
+  }
+});
+
+app.post("/api/decline_order/", async (req, res) => {
+  const { orderId, remarks } = req.body;
+  try {
+    const query = `UPDATE tblorders_customer SET status = "Decline", remarks = ? WHERE order_id = ?`;
+    await db.query(query, [remarks, orderId], (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
         return res.status(500).json({ message: "Internal server error" });
@@ -5275,15 +5760,17 @@ app.post("/api/status_preparing/", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+//** ORDERS **/
 
-//* PREPARING MODULE **//
+//** PREPARING MODULE **//
+
 // FETCH PREPARING ORDERS
 app.get("/api/preparing_Orders/", (req, res) => {
   const sql = `SELECT DISTINCT *
-               FROM tblorders_customer 
-               WHERE status = "PREPARING" 
-               GROUP BY order_id
-               ORDER BY date DESC, order_id DESC;`;
+                FROM tblorders_customer 
+                WHERE status = "PREPARING" 
+                GROUP BY order_id
+                ORDER BY date DESC, order_id DESC;`;
 
   db.query(sql, (err, result) => {
     if (err) {
@@ -5295,8 +5782,8 @@ app.get("/api/preparing_Orders/", (req, res) => {
 
     if (!result || result.length === 0) {
       return res
-        .status(404)
-        .json({ status: "error", res: "No pending orders found." });
+        .status(200)
+        .json({ status: "success", res: "No preparing orders found." });
     }
 
     const orders = [];
@@ -5305,9 +5792,9 @@ app.get("/api/preparing_Orders/", (req, res) => {
     const fetchProductsForOrder = (order) => {
       return new Promise((resolve, reject) => {
         const productSql = `SELECT *
-                            FROM tblorders_customer 
-                            WHERE order_id = ? 
-                            ORDER BY order_id DESC;`;
+                              FROM tblorders_customer 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
 
         db.query(productSql, [order.order_id], (err, products) => {
           if (err) {
@@ -5363,10 +5850,10 @@ app.post("/api/status_prepared/", async (req, res) => {
 //* PREPARED MODULE **//
 app.get("/api/prepared_Orders/", (req, res) => {
   const sql = `SELECT DISTINCT *
-               FROM tblorders_customer 
-               WHERE status = "PREPARED" 
-               GROUP BY order_id
-               ORDER BY date DESC, order_id DESC;`;
+                FROM tblorders_customer 
+                WHERE status = "PREPARED" 
+                GROUP BY order_id
+                ORDER BY date DESC, order_id DESC;`;
 
   db.query(sql, (err, result) => {
     if (err) {
@@ -5378,8 +5865,8 @@ app.get("/api/prepared_Orders/", (req, res) => {
 
     if (!result || result.length === 0) {
       return res
-        .status(404)
-        .json({ status: "error", res: "No pending orders found." });
+        .status(200)
+        .json({ status: "success", res: "No prepared orders found." });
     }
 
     const orders = [];
@@ -5388,9 +5875,9 @@ app.get("/api/prepared_Orders/", (req, res) => {
     const fetchProductsForOrder = (order) => {
       return new Promise((resolve, reject) => {
         const productSql = `SELECT *
-                            FROM tblorders_customer 
-                            WHERE order_id = ? 
-                            ORDER BY order_id DESC;`;
+                              FROM tblorders_customer 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
 
         db.query(productSql, [order.order_id], (err, products) => {
           if (err) {
@@ -5424,7 +5911,7 @@ app.get("/api/prepared_Orders/", (req, res) => {
 
 // FETCH ALL VEHICLE
 app.get("/api/vehicle/", (req, res) => {
-  const sql = `SELECT DISTINCT vehicle_type FROM tblvehicle ORDER BY vehicle_type`;
+  const sql = `SELECT DISTINCT vehicle_type FROM tblvehicle WHERE vehicle_available = 1 ORDER BY vehicle_type `;
 
   db.query(sql, (err, result) => {
     if (err) {
@@ -5513,106 +6000,12 @@ app.post("/api/status_ready/", async (req, res) => {
 //* PREPARED MODULE **//
 
 //** READY TO GO MODULE *//
-//FETCH READY2GO COURIER
-// app.get("/api/courier_ready/", (req, res) => {
-//   const sql = `SELECT DISTINCT v.*
-//                 FROM tblorders_customer c
-//                 JOIN tblvehicle v ON c.vehicle_plate = v.vehicle_plate
-//                 WHERE c.status = "READY";
-//                `;
-
-//   db.query(sql, (err, result) => {
-//     if (err) {
-//       console.error("Error fetching orders:", err);
-//       return res
-//         .status(500)
-//         .json({ status: "error", message: "Internal server error" });
-//     }
-
-//     if (!result || result.length === 0) {
-//       return res
-//         .status(404)
-//         .json({ status: "error", message: "No pending orders found." });
-//     }
-
-//     // Use async function inside a loop to handle multiple queries
-//     const fetchOrdersOfCourier = (vehicle_plate) => {
-//       return new Promise((resolve, reject) => {
-//         const orderSql = `SELECT DISTINCT order_id
-//                           FROM tblorders_customer
-//                           WHERE vehicle_plate = ?
-//                           AND status = "READY"
-//                           ORDER BY order_id DESC`;
-
-//         db.query(orderSql, [vehicle_plate], (err, orders) => {
-//           if (err) {
-//             return reject(err);
-//           }
-
-//           // Now fetch products for each distinct order_id
-//           const fetchProductsForOrder = (order_id) => {
-//             return new Promise((resolve, reject) => {
-//               const productSql = `SELECT *
-//                                   FROM tblorders_customer
-//                                   WHERE order_id = ?
-//                                   AND status = "READY"`;
-
-//               db.query(productSql, [order_id], (err, products) => {
-//                 if (err) {
-//                   return reject(err);
-//                 }
-//                 resolve(products);
-//               });
-//             });
-//           };
-
-//           // Fetch products for each order_id and add them to the result
-//           const fetchAllProducts = async () => {
-//             try {
-//               const ordersWithProducts = await Promise.all(
-//                 orders.map(async (order) => {
-//                   const products = await fetchProductsForOrder(order.order_id);
-//                   return { ...order, products };
-//                 })
-//               );
-
-//               resolve({ vehicle_plate, rider, vehicle_type, ordersWithProducts });
-//             } catch (err) {
-//               reject(err);
-//             }
-//           };
-
-//           fetchAllProducts();
-//         });
-//       });
-//     };
-
-//     const fetchAllOrders = async () => {
-//       try {
-//         const ordersWithProducts = await Promise.all(
-//           result.map((order) => fetchOrdersOfCourier(order.vehicle_plate))
-//         );
-
-//         return res
-//           .status(200)
-//           .json({ status: "success", res: ordersWithProducts });
-//       } catch (err) {
-//         console.error("Error fetching products:", err);
-//         return res
-//           .status(500)
-//           .json({ status: "error", message: "Internal server error" });
-//       }
-//     };
-
-//     fetchAllOrders();
-//   });
-// });
 
 app.get("/api/courier_ready/", (req, res) => {
   const sql = `SELECT DISTINCT v.vehicle_plate, v.rider, v.vehicle_type, v.vehicle_available
-               FROM tblorders_customer c
-               JOIN tblvehicle v ON c.vehicle_plate = v.vehicle_plate
-               WHERE c.status = "READY";`;
+                FROM tblorders_customer c
+                JOIN tblvehicle v ON c.vehicle_plate = v.vehicle_plate
+                WHERE c.status = "READY";`;
 
   db.query(sql, async (err, result) => {
     if (err) {
@@ -5623,9 +6016,10 @@ app.get("/api/courier_ready/", (req, res) => {
     }
 
     if (!result || result.length === 0) {
-      return res
-        .status(404)
-        .json({ status: "error", message: "No pending orders found." });
+      return res.status(200).json({
+        status: "success",
+        message: "No couriers are available to proceed.",
+      });
     }
 
     try {
@@ -5633,10 +6027,10 @@ app.get("/api/courier_ready/", (req, res) => {
       const ordersWithProducts = await Promise.all(
         result.map(async (vehicle) => {
           const orderSql = `SELECT DISTINCT order_id, customer_loc, total_sum_price
-                            FROM tblorders_customer
-                            WHERE vehicle_plate = ?
-                            AND status = "READY"
-                            ORDER BY order_id DESC`;
+                              FROM tblorders_customer
+                              WHERE vehicle_plate = ?
+                              AND status = "READY"
+                              ORDER BY order_id DESC`;
 
           const orders = await new Promise((resolve, reject) => {
             db.query(orderSql, [vehicle.vehicle_plate], (err, orders) => {
@@ -5651,9 +6045,9 @@ app.get("/api/courier_ready/", (req, res) => {
           const enrichedOrders = await Promise.all(
             orders.map(async (order) => {
               const productSql = `SELECT * 
-                                  FROM tblorders_customer 
-                                  WHERE order_id = ? 
-                                  AND status = "READY"`;
+                                    FROM tblorders_customer 
+                                    WHERE order_id = ? 
+                                    AND status = "READY"`;
 
               const products = await new Promise((resolve, reject) => {
                 db.query(productSql, [order.order_id], (err, products) => {
@@ -5699,37 +6093,38 @@ app.get("/api/courier_ready/", (req, res) => {
 
 app.post("/api/status_transit/", async (req, res) => {
   const { plate } = req.body;
-  
 
   const date_and_time = new Date();
 
-// Convert to Manila time (Asia/Manila timezone)
-const options = {
-  timeZone: 'Asia/Manila',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hour12: false, // Use 24-hour format
-};
+  // Convert to Manila time (Asia/Manila timezone)
+  const options = {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false, // Use 24-hour format
+  };
 
-const manilaTime = new Intl.DateTimeFormat('en-PH', options).format(date_and_time);
+  const manilaTime = new Intl.DateTimeFormat("en-PH", options).format(
+    date_and_time
+  );
 
-// Manually replace the slashes (/) with hyphens (-)
-const formattedTime = manilaTime.replace(/\//g, '-');
-
-console.log("Current date and time in Manila:", formattedTime);
+  // Manually replace the slashes (/) with hyphens (-) and remove the comma ","
+  const formattedDateTime = manilaTime.replace(
+    /(\d{2})\/(\d{2})\/(\d{4}), (\d{2}):(\d{2})/g,
+    "$1-$2-$3 $4:$5"
+  );
 
   try {
     // Update the status and set the current time in tblorders_customer
     const query1 = `
-      UPDATE tblorders_customer 
-      SET status = "TRANSIT", time_out = ?
-      WHERE vehicle_plate = ?`;
+        UPDATE tblorders_customer 
+        SET status = "Transit", time_out = ?
+        WHERE vehicle_plate = ?`;
 
-    await db.query(query1, [formattedTime, plate], (err, result1) => {
+    await db.query(query1, [formattedDateTime, plate], (err, result1) => {
       if (err) {
         console.error("Error updating order status and time_out:", err);
         return res.status(500).json({ message: " Internal server error" });
@@ -5759,59 +6154,602 @@ console.log("Current date and time in Manila:", formattedTime);
 
 // ** READY TO GO MODULE **//
 
-// FETCH PREPARING ORDERS
-// app.get("/api/preparing_Orders/", (req, res) => {
-//   const sql = `SELECT DISTINCT order_id, mop, ref_no, customer_id, customer_name, date, customer_loc, total_sum_price, status, date
-//                FROM tblorders_customer
-//                WHERE status = "Preparing"
-//                ORDER BY date DESC, order_id DESC;`;
+// ** TRANSIT ** //
 
-//   db.query(sql, (err, result) => {
-//     if (err) {
-//       console.error("Error fetching modes of payment:", err);
-//       return res
-//         .status(500)
-//         .json({ status: "error", message: "Internal server error" });
-//     }
-//     if (!result || result.length === 0) {
-//       return res
-//         .status(404)
-//         .json({ status: "error", res: "No pending orders found." });
-//     }
-//     return res.status(200).json({ status: "success", res: result });
-//   });
-// });
+//fetch transit
+app.get("/api/transit/", (req, res) => {
+  const sql = `SELECT DISTINCT v.vehicle_plate, v.rider, v.vehicle_type, v.vehicle_available
+                FROM tblorders_customer c
+                JOIN tblvehicle v ON c.vehicle_plate = v.vehicle_plate
+                WHERE c.status = "Transit";`;
 
-// // FETCH PREPARED ORDERS
-// app.get("/api/prepared_Orders/", (req, res) => {
-//   const sql = `SELECT DISTINCT order_id, mop, ref_no, customer_id, customer_name, date, customer_loc, total_sum_price, status
-//                FROM tblorders_customer
-//                WHERE status = "Prepared"
-//                ORDER BY date DESC, order_id DESC;`;
+  db.query(sql, async (err, result) => {
+    if (err) {
+      console.error("Error fetching vehicles:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
 
-//   db.query(sql, (err, result) => {
-//     if (err) {
-//       console.error("Error fetching modes of payment:", err);
-//       return res
-//         .status(500)
-//         .json({ status: "error", message: "Internal server error" });
-//     }
-//     if (!result || result.length === 0) {
-//       return res
-//         .status(404)
-//         .json({ status: "error", res: "No pending orders found." });
-//     }
-//     return res.status(200).json({ status: "success", res: result });
-//   });
-// });
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", message: "No transit orders found." });
+    }
+
+    try {
+      // For each vehicle_plate, fetch the orders and associated products
+      const ordersWithProducts = await Promise.all(
+        result.map(async (vehicle) => {
+          const orderSql = `SELECT DISTINCT order_id, customer_loc, customer_name,total_sum_price, time_out, mop
+                              FROM tblorders_customer
+                              WHERE vehicle_plate = ?
+                              AND status = "Transit"
+                              ORDER BY order_id DESC`;
+
+          const orders = await new Promise((resolve, reject) => {
+            db.query(orderSql, [vehicle.vehicle_plate], (err, orders) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve(orders);
+            });
+          });
+
+          // Fetch products for each order
+          const enrichedOrders = await Promise.all(
+            orders.map(async (order) => {
+              const productSql = `SELECT * 
+                                    FROM tblorders_customer 
+                                    WHERE order_id = ? 
+                                    AND status = "Transit"`;
+
+              const products = await new Promise((resolve, reject) => {
+                db.query(productSql, [order.order_id], (err, products) => {
+                  if (err) {
+                    return reject(err);
+                  }
+                  resolve(products);
+                });
+              });
+
+              return {
+                order_id: order.order_id,
+                mop: order.mop,
+                customer_loc: order.customer_loc,
+                customer_name: order.customer_name,
+                total_sum_price: order.total_sum_price,
+                time_out: order.time_out,
+                products,
+              };
+            })
+          );
+
+          // Add the enriched order data to the vehicle
+          return {
+            vehicle_plate: vehicle.vehicle_plate,
+            rider: vehicle.rider,
+            vehicle_type: vehicle.vehicle_type,
+            vehicle_available: vehicle.vehicle_available,
+            orders: enrichedOrders,
+          };
+        })
+      );
+
+      // Respond with the fully enriched data
+      return res
+        .status(200)
+        .json({ status: "success", res: ordersWithProducts });
+    } catch (err) {
+      console.error("Error fetching orders/products:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+  });
+});
+
+//fetch done delivery
+app.get("/api/returned_courier/", (req, res) => {
+  const sql = `SELECT DISTINCT v.vehicle_plate, v.rider, v.vehicle_type, v.vehicle_available
+                FROM tblorders_customer c
+                JOIN tblvehicle v ON c.vehicle_plate = v.vehicle_plate
+                WHERE c.status = "SALES";`;
+
+  db.query(sql, async (err, result) => {
+    if (err) {
+      console.error("Error fetching vehicles:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "No pending orders found." });
+    }
+
+    try {
+      // For each vehicle_plate, fetch the orders and associated products
+      const ordersWithProducts = await Promise.all(
+        result.map(async (vehicle) => {
+          const orderSql = `SELECT DISTINCT order_id, customer_loc, customer_name,total_sum_price, time_out, mop
+                              FROM tblorders_customer
+                              WHERE vehicle_plate = ?
+                              AND status = "SALES"
+                              ORDER BY order_id DESC`;
+
+          const orders = await new Promise((resolve, reject) => {
+            db.query(orderSql, [vehicle.vehicle_plate], (err, orders) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve(orders);
+            });
+          });
+
+          // Fetch products for each order
+          const enrichedOrders = await Promise.all(
+            orders.map(async (order) => {
+              const productSql = `SELECT * 
+                                    FROM tblorders_customer 
+                                    WHERE order_id = ? 
+                                    AND status = "SALES"`;
+
+              const products = await new Promise((resolve, reject) => {
+                db.query(productSql, [order.order_id], (err, products) => {
+                  if (err) {
+                    return reject(err);
+                  }
+                  resolve(products);
+                });
+              });
+
+              return {
+                order_id: order.order_id,
+                mop: order.mop,
+                customer_loc: order.customer_loc,
+                customer_name: order.customer_name,
+                total_sum_price: order.total_sum_price,
+                time_out: order.time_out,
+                products,
+              };
+            })
+          );
+
+          // Add the enriched order data to the vehicle
+          return {
+            vehicle_plate: vehicle.vehicle_plate,
+            rider: vehicle.rider,
+            vehicle_type: vehicle.vehicle_type,
+            vehicle_available: vehicle.vehicle_available,
+            orders: enrichedOrders,
+          };
+        })
+      );
+
+      // Respond with the fully enriched data
+      return res
+        .status(200)
+        .json({ status: "success", res: ordersWithProducts });
+    } catch (err) {
+      console.error("Error fetching orders/products:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+  });
+});
+
+app.post("/api/insertSales/", async (req, res) => {
+  try {
+    const { plate } = req.body;
+
+    const date_and_time = new Date();
+
+    // Convert to Manila time (Asia/Manila timezone)
+    const options = {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false, // Use 24-hour format
+    };
+
+    const manilaTime = new Intl.DateTimeFormat("en-PH", options).format(
+      date_and_time
+    );
+
+    // Manually replace the slashes (/) with hyphens (-) and remove the comma ","
+    const formattedDateTime = manilaTime.replace(
+      /(\d{2})\/(\d{2})\/(\d{4}), (\d{2}):(\d{2})/g,
+      "$1-$2-$3 $4:$5"
+    );
+
+    if (!plate) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Vehicle plate is required" });
+    }
+
+    const selectQuery =
+      "SELECT * FROM tblorders_customer WHERE vehicle_plate = ?";
+    const orders = await new Promise((resolve, reject) => {
+      db.query(selectQuery, [plate], (err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(result);
+      });
+    });
+
+    if (orders.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No orders found for the given vehicle plate.",
+      });
+    }
+
+    const insertQuery = "INSERT INTO tblsales SET ?";
+    console.log("INSERTED: ", insertQuery);
+
+    await Promise.all(
+      orders.map((order) => {
+        const {
+          status,
+          rider,
+          vehicle_type,
+          vehicle_available,
+          remarks,
+          ...ordersWithProducts
+        } = order;
+
+        ordersWithProducts.time_return = formattedDateTime;
+
+        return new Promise((resolve, reject) => {
+          db.query(insertQuery, ordersWithProducts, (err, result) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(result);
+          });
+        });
+      })
+    );
+
+    const deleteQuery =
+      "DELETE FROM tblorders_customer WHERE vehicle_plate = ?";
+    await new Promise((resolve, reject) => {
+      db.query(deleteQuery, [plate], (err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(result);
+      });
+    });
+
+    const updateQuery =
+      "UPDATE tblvehicle SET vehicle_available = 1 WHERE vehicle_plate = ?";
+    await new Promise((resolve, reject) => {
+      db.query(updateQuery, [plate], (err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(result);
+      });
+    });
+
+    return res.status(200).json({ status: "success", message: "Orders done." });
+  } catch (error) {
+    console.error("Error inserting sales: ", error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
+// Fetch courier done delivery
+app.get("/api/fetchDoneCourier/", (req, res) => {
+  const sql = `SELECT DISTINCT 
+                  ts.time_return, 
+                  ts.vehicle_plate, 
+                  tv.rider, 
+                  tv.vehicle_type
+              FROM 
+                  tblsales ts
+              JOIN 
+                  tblvehicle tv
+              ON 
+                  ts.vehicle_plate = tv.vehicle_plate
+              ORDER BY time_return DESC;`;
+
+  db.query(sql, async (err, result) => {
+    if (err) {
+      console.error("Error fetching vehicles:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", message: "No transit orders found." });
+    }
+
+    try {
+      // For each distinct vehicle_plate and time_return, fetch the orders and products
+      const ordersWithProducts = await Promise.all(
+        result.map(async (vehicle) => {
+          const orderSql = `SELECT DISTINCT order_id, customer_loc, customer_name, total_sum_price, time_out, time_return, mop
+                              FROM tblsales
+                              WHERE vehicle_plate = ? AND time_return = ?
+                              ORDER BY order_id DESC`;
+
+          const orders = await new Promise((resolve, reject) => {
+            db.query(
+              orderSql,
+              [vehicle.vehicle_plate, vehicle.time_return],
+              (err, orders) => {
+                if (err) {
+                  return reject(err);
+                }
+                resolve(orders);
+              }
+            );
+          });
+
+          // Fetch products for each order
+          const enrichedOrders = await Promise.all(
+            orders.map(async (order) => {
+              const productSql = `SELECT * 
+                                    FROM tblsales 
+                                    WHERE order_id = ?`;
+
+              const products = await new Promise((resolve, reject) => {
+                db.query(productSql, [order.order_id], (err, products) => {
+                  if (err) {
+                    return reject(err);
+                  }
+                  resolve(products);
+                });
+              });
+
+              return {
+                order_id: order.order_id,
+                mop: order.mop,
+                customer_loc: order.customer_loc,
+                customer_name: order.customer_name,
+                total_sum_price: order.total_sum_price,
+                time_out: order.time_out,
+                products,
+              };
+            })
+          );
+
+          // Add the enriched order data to the vehicle
+          return {
+            vehicle_plate: vehicle.vehicle_plate,
+            rider: vehicle.rider,
+            vehicle_type: vehicle.vehicle_type,
+            time_return: vehicle.time_return,
+            orders: enrichedOrders,
+          };
+        })
+      );
+
+      // Respond with the fully enriched data
+      return res
+        .status(200)
+        .json({ status: "success", res: ordersWithProducts });
+    } catch (err) {
+      console.error("Error fetching orders/products:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+  });
+});
+
+// ** TRANSIT ** //
+
+// ** SALES MODULE ** //
+
+app.get("/api/sales_order/", (req, res) => {
+  const sql = `SELECT DISTINCT *
+                FROM tblsales 
+                GROUP BY order_id
+                ORDER BY time_return DESC, order_id DESC;
+                `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", res: "No preparing orders found." });
+    }
+
+    const orders = [];
+
+    // Use async function inside a loop to handle multiple queries
+    const fetchProductsForOrder = (order) => {
+      return new Promise((resolve, reject) => {
+        const productSql = `SELECT *
+                              FROM tblsales 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
+
+        db.query(productSql, [order.order_id], (err, products) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve({ ...order, products });
+        });
+      });
+    };
+
+    const fetchAllOrders = async () => {
+      try {
+        const ordersWithProducts = await Promise.all(
+          result.map((order) => fetchProductsForOrder(order))
+        );
+
+        return res
+          .status(200)
+          .json({ status: "success", res: ordersWithProducts });
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+    };
+
+    fetchAllOrders();
+  });
+});
+
+// ** SALES MODULE ** //
+
+//DECLINE MODULE
+app.get("/api/decline_orders/", (req, res) => {
+  const sql = `SELECT DISTINCT *
+                FROM tblorders_customer 
+                WHERE status = "Decline" 
+                GROUP BY order_id
+                ORDER BY date DESC, order_id DESC;`;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", res: "No pending orders found." });
+    }
+
+    const orders = [];
+
+    // Use async function inside a loop to handle multiple queries
+    const fetchProductsForOrder = (order) => {
+      return new Promise((resolve, reject) => {
+        const productSql = `SELECT *
+                              FROM tblorders_customer 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
+
+        db.query(productSql, [order.order_id], (err, products) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve({ ...order, products });
+        });
+      });
+    };
+
+    const fetchAllOrders = async () => {
+      try {
+        const ordersWithProducts = await Promise.all(
+          result.map((order) => fetchProductsForOrder(order))
+        );
+
+        return res
+          .status(200)
+          .json({ status: "success", res: ordersWithProducts });
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+    };
+
+    fetchAllOrders();
+  });
+});
+
+//CANCELLED MODULE
+app.get("/api/cancelled_orders/", (req, res) => {
+  const sql = `SELECT DISTINCT *
+                FROM tblorders_customer 
+                WHERE status = "Cancelled" 
+                GROUP BY order_id
+                ORDER BY date DESC, order_id DESC;`;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", res: "No pending orders found." });
+    }
+
+    const orders = [];
+
+    // Use async function inside a loop to handle multiple queries
+    const fetchProductsForOrder = (order) => {
+      return new Promise((resolve, reject) => {
+        const productSql = `SELECT *
+                              FROM tblorders_customer 
+                              WHERE order_id = ? 
+                              ORDER BY order_id DESC;`;
+
+        db.query(productSql, [order.order_id], (err, products) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve({ ...order, products });
+        });
+      });
+    };
+
+    const fetchAllOrders = async () => {
+      try {
+        const ordersWithProducts = await Promise.all(
+          result.map((order) => fetchProductsForOrder(order))
+        );
+
+        return res
+          .status(200)
+          .json({ status: "success", res: ordersWithProducts });
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+    };
+
+    fetchAllOrders();
+  });
+});
 
 /*
-SALES
-*/
+  SALES
+  */
 
 /*
-CUSTOMER
-*/
+  CUSTOMER
+  */
 
 //FETCH MODE OF PAYMENT TABLE
 app.get("/api/fetchmop/", (req, res) => {
@@ -5837,11 +6775,11 @@ app.get("/api/api-get-customer-info/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
     const sql = `
-   SELECT c.name, c.location
-   FROM tblusers u 
-   LEFT JOIN tblcustomer c ON c.customer_id = u.id 
-   WHERE u.id = '${userId}'
-`;
+    SELECT c.name, c.location
+    FROM tblusers u 
+    LEFT JOIN tblcustomer c ON c.customer_id = u.id 
+    WHERE u.id = '${userId}'
+  `;
     await db.query(sql, (err, result) => {
       console.log(result[0]);
       return res.status(200).json({ status: "success", res: result[0] });
@@ -5854,7 +6792,7 @@ app.get("/api/api-get-customer-info/:userId", async (req, res) => {
 
 app.get("/api/api-items", async (req, res) => {
   try {
-    const sql = `SELECT * FROM tblitems`;
+    const sql = `SELECT * FROM tblitems WHERE quantity != 0`;
     await db.query(sql, (err, result) => {
       return res.status(200).json({ status: "success", res: result });
     });
@@ -5890,8 +6828,8 @@ app.post("/api/api-insert-to-cart", async (req, res) => {
   // }
   try {
     const sql = `INSERT INTO tblcart 
-    (item_id, item_name, price, description, qty, total_price, isOrdered, customer_id, customer_name, customer_loc) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      (item_id, item_name, price, description, qty, total_price, isOrdered, customer_id, customer_name, customer_loc) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     await db.query(
       sql,
@@ -5930,12 +6868,12 @@ app.get("/api/mycart/:userId", async (req, res) => {
     const userId = req.params.userId;
 
     const sql = `SELECT item_id, item_name, description, price, 
-    SUM(qty) AS qty,
-    SUM(total_price) AS total_price
-    FROM tblcart 
-    WHERE isOrdered = "0" 
-    AND customer_id = ${userId} 
-    GROUP BY item_name, price;`;
+      SUM(qty) AS qty,
+      SUM(total_price) AS total_price
+      FROM tblcart 
+      WHERE isOrdered = "0" 
+      AND customer_id = ${userId} 
+      GROUP BY item_name, price;`;
 
     await db.query(sql, (err, result) => {
       return res.status(200).json({ status: "success", res: result });
@@ -5984,67 +6922,178 @@ app.post("/api/checkout_cus", async (req, res) => {
     customerLoc,
   } = req.body;
 
+  console.log("payment: ", payment);
+
+  // Validate required fields
   if (!userId || !cartItems || cartItems.length === 0) {
-    return res.status(400).json({ message: "Invalid data provided" });
+    return res.status(400).json({ message: "Invalid data provided." });
   }
 
-  const order_id = `ORD-${Date.now()}`;
-  const currentDate = new Date()
-    .toLocaleDateString("en-PH", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-    .replace(/\//g, "-");
-  const defaultStatus = "Pending";
+  // Check if payment method exists in tbl_mop
+  const checkPaymentSql = `SELECT * FROM tbl_mop WHERE mop = ?`;
 
   try {
-    for (const item of cartItems) {
-      const sql = `
-        INSERT INTO tblorders_customer (
-          order_id,
-          mop,
-          ref_no,
-          item_name,
-          description,
-          price,
-          quantity,
-          total_price,
-          total_sum_price,
-          status,
-          date,
-          customer_id,
-          customer_name,
-          customer_loc
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      await db.query(sql, [
-        order_id,
-        payment,
-        refNo,
-        item.item_name,
-        item.description,
-        item.price,
-        item.qty,
-        item.total_price,
-        totalSum,
-        defaultStatus,
-        currentDate,
-        customerId,
-        customerName,
-        customerLoc,
-      ]);
-    }
+    db.query(checkPaymentSql, [payment], (err, rows) => {
+      console.log("ROWS SA TBL_MOP: ", rows);
 
-    // Optionally clear the cart after successful checkout
-    const clearCartSql = `DELETE FROM tblcart WHERE customer_id = ?`;
-    await db.query(clearCartSql, [userId]);
+      if (err) {
+        console.error("Error checking payment method:", err);
+        return res.status(500).json({ message: "Internal server error." });
+      }
 
-    res.status(200).json({ message: "Order placed successfully." });
+      if (rows.length === 0) {
+        console.log("Invalid mode of payment.");
+        return res.status(400).json({ message: "Invalid mode of payment." });
+      }
+
+      const paymentInfo = rows[0]; // Assume one row matches the query
+
+      console.log("===>", typeof paymentInfo.attach_file);
+
+      // If attached_file is 0, allow refNo to be null or empty
+      if (paymentInfo.attach_file === 0 && (!refNo || refNo.trim() === "")) {
+        console.log(
+          "Reference number validation skipped due to payment method settings."
+        );
+
+        // Proceed with order insertion
+        insertOrder(
+          cartItems,
+          payment,
+          null,
+          totalSum,
+          customerId,
+          customerName,
+          customerLoc,
+          res
+        );
+      } else {
+        // Validate refNo only if attached_file is not 0
+        const checkRefNoSql = `SELECT * FROM tblorders_customer WHERE ref_no = ?`;
+
+        db.query(checkRefNoSql, [refNo], async (err, rows) => {
+          console.log("rows: ", rows.length);
+
+          if (err) {
+            console.error("Error checking refNo:", err);
+            return res.status(500).json({ message: "Internal server error." });
+          }
+
+          if (rows.length > 0) {
+            return res.status(400).json({
+              message:
+                "Reference number already used. Please use a different one.",
+            });
+          }
+
+          // Proceed with order insertion as refNo is valid
+          insertOrder(
+            cartItems,
+            payment,
+            refNo,
+            totalSum,
+            customerId,
+            customerName,
+            customerLoc,
+            res
+          );
+        });
+      }
+    });
   } catch (error) {
     console.error("Error during checkout:", error);
     res.status(500).json({ message: "Checkout failed. Please try again." });
+  }
+
+  // Helper function to handle order insertion
+  function insertOrder(
+    cartItems,
+    payment,
+    refNo,
+    totalSum,
+    customerId,
+    customerName,
+    customerLoc,
+    res
+  ) {
+    const order_id = `ORD-${Date.now()}`;
+    const currentDate = new Date()
+      .toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+      .replace(/\//g, "-");
+    const defaultStatus = "Pending";
+
+    const insertOrderPromises = cartItems.map((item) => {
+      console.log("item: ", item);
+      const sql = `
+      INSERT INTO tblorders_customer (
+        order_id,
+        mop,
+        ref_no,
+        itemId,
+        item_name,
+        description,
+        price,
+        quantity,
+        total_price,
+        total_sum_price,
+        status,
+        date,
+        customer_id,
+        customer_name,
+        customer_loc
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+      return new Promise((resolve, reject) => {
+        db.query(
+          sql,
+          [
+            order_id,
+            payment,
+            refNo,
+            item.item_id,
+            item.item_name,
+            item.description,
+            item.price,
+            item.qty,
+            item.total_price,
+            totalSum,
+            defaultStatus,
+            currentDate,
+            customerId,
+            customerName,
+            customerLoc,
+          ],
+          (err, result) => {
+            if (err) {
+              reject("Error inserting order: " + err);
+            } else {
+              resolve(result);
+            }
+          }
+        );
+      });
+    });
+
+    Promise.all(insertOrderPromises)
+      .then(() => {
+        const clearCartSql = `DELETE FROM tblcart WHERE customer_id = ?`;
+        db.query(clearCartSql, [customerId], (err) => {
+          if (err) {
+            console.error("Error clearing cart:", err);
+          }
+        });
+
+        res.status(200).json({ message: "Order placed successfully." });
+      })
+      .catch((error) => {
+        console.error(error);
+        res.status(500).json({ message: "Failed to place order." });
+      });
   }
 });
 
@@ -6053,93 +7102,65 @@ app.get("/api/orders_customer/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    const sql = `SELECT DISTINCT order_id, mop, ref_no, total_sum_price, status, date 
-                FROM tblorders_customer 
-                WHERE customer_id = ${userId} 
-                  AND status IN ("Pending", "Transit", "Completed") -- Include only Pending and Completed statuses
-                ORDER BY 
-                  CASE 
-                    WHEN status = "Pending" THEN 1 
-                    WHEN status = "Transit" THEN 2 
-                    WHEN status = "Completed" THEN 3 
-                    ELSE 4
-                  END,
-                  date DESC;`;
+    const sql = `SELECT DISTINCT *
+      FROM tblorders_customer
+      WHERE customer_id = ${userId} 
+        AND status NOT IN ('Cancelled', 'Decline')
+      GROUP BY order_id
+      ORDER BY date DESC, order_id DESC;
+      `;
 
-    // const sql = `SELECT DISTINCT order_id, total_sum_price, status, date
-    //              FROM tblorders_customer
-    //              WHERE customer_id = ${userId}
-    //              AND status = "Pending"
-    //              ORDER BY date DESC;`;
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.error("Error fetching orders:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
 
-    await db.query(sql, (err, result) => {
-      return res.status(200).json({ status: "success", res: result });
-    });
-  } catch (error) {
-    console.error("Error fetching customer name:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+      if (!result || result.length === 0) {
+        return res
+          .status(200)
+          .json({ status: "success", res: "No pending orders found." });
+      }
 
-//fetch orders of customer (tblorder_customer) PREPARING
-app.get("/api/orders_preparing/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
+      const orders = [];
 
-    const sql = `SELECT DISTINCT order_id, mop, ref_no, total_sum_price, status, date 
-                FROM tblorders_customer 
-                WHERE customer_id = ${userId} 
-                  AND status = "Preparing"
-                  ORDER BY date DESC;`;
+      // Use async function inside a loop to handle multiple queries
+      const fetchProductsForOrder = (order) => {
+        return new Promise((resolve, reject) => {
+          const productSql = `SELECT *
+                  FROM tblorders_customer 
+                  WHERE order_id = ? 
+                  ORDER BY order_id DESC;`;
 
-    // const sql = `SELECT DISTINCT order_id, total_sum_price, status, date
-    //              FROM tblorders_customer
-    //              WHERE customer_id = ${userId}
-    //              AND status = "Pending"
-    //              ORDER BY date DESC;`;
+          db.query(productSql, [order.order_id], (err, products) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve({ ...order, products });
+          });
+        });
+      };
 
-    await db.query(sql, (err, result) => {
-      return res.status(200).json({ status: "success", res: result });
-    });
-  } catch (error) {
-    console.error("Error fetching customer name:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+      const fetchAllOrders = async () => {
+        try {
+          const ordersWithProducts = await Promise.all(
+            result.map((order) => fetchProductsForOrder(order))
+          );
 
-//fetch orders of customer (tblorder_customer) PREPARED
-app.get("/api/orders_prepared/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
+          return res
+            .status(200)
+            .json({ status: "success", res: ordersWithProducts });
+        } catch (err) {
+          console.error("Error fetching products:", err);
+          return res
+            .status(500)
+            .json({ status: "error", message: "Internal server error" });
+        }
+      };
 
-    const sql = `SELECT DISTINCT order_id, mop, ref_no, total_sum_price, status, date 
-                FROM tblorders_customer 
-                WHERE customer_id = ${userId} 
-                  AND status = "Prepared"
-                  ORDER BY date DESC;`;
-
-    await db.query(sql, (err, result) => {
-      return res.status(200).json({ status: "success", res: result });
-    });
-  } catch (error) {
-    console.error("Error fetching customer name:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-//fetch orders of customer (tblorder_customer) Transit
-app.get("/api/orders_transit/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
-
-    const sql = `SELECT DISTINCT order_id, mop, ref_no, total_sum_price, status, date 
-                FROM tblorders_customer 
-                WHERE customer_id = ${userId} 
-                  AND status = "Transit"
-                  ORDER BY date DESC;`;
-
-    await db.query(sql, (err, result) => {
-      return res.status(200).json({ status: "success", res: result });
+      fetchAllOrders();
     });
   } catch (error) {
     console.error("Error fetching customer name:", error);
@@ -6152,10 +7173,10 @@ app.get("/api/orders_customer_cancelled/:userId", async (req, res) => {
     const userId = req.params.userId;
 
     const sql = `SELECT DISTINCT order_id, mop, ref_no, total_sum_price, status, date 
-                 FROM tblorders_customer 
-                 WHERE customer_id = ${userId} 
-                 AND status = "Cancelled"
-                 ORDER BY order_id ASC;`;
+                  FROM tblorders_customer 
+                  WHERE customer_id = ${userId} 
+                  AND status = "Cancelled"
+                  ORDER BY order_id ASC;`;
 
     await db.query(sql, (err, result) => {
       return res.status(200).json({ status: "success", res: result });
@@ -6167,16 +7188,132 @@ app.get("/api/orders_customer_cancelled/:userId", async (req, res) => {
 });
 
 // fetch products of order
-app.post("/api/orders_products/", async (req, res) => {
-  const { userId, orderId } = req.body;
-  try {
-    const query = `SELECT * FROM tblorders_customer WHERE customer_id = ? AND order_id = ?`;
-    await db.query(query, [userId, orderId], (err, result) => {
-      if (err) {
-        console.error("Error executing query:", err);
-        return res.status(500).json({ message: "Internal server error" });
+app.get("/api/orders_products/:userId", (req, res) => {
+  const { userId } = req.body;
+
+  const sql = `SELECT DISTINCT *
+    FROM tblorders_customer 
+    WHERE status = "PENDING" 
+    GROUP BY order_id
+    ORDER BY date DESC, order_id DESC;`;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("Error fetching orders:", err);
+      return res
+        .status(500)
+        .json({ status: "error", message: "Internal server error" });
+    }
+
+    if (!result || result.length === 0) {
+      return res
+        .status(200)
+        .json({ status: "success", res: "No pending orders found." });
+    }
+
+    const orders = [];
+
+    // Use async function inside a loop to handle multiple queries
+    const fetchProductsForOrder = (order) => {
+      return new Promise((resolve, reject) => {
+        const productSql = `SELECT *
+                  FROM tblorders_customer 
+                  WHERE order_id = ? 
+                  ORDER BY order_id DESC;`;
+
+        db.query(productSql, [order.order_id], (err, products) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve({ ...order, products });
+        });
+      });
+    };
+
+    const fetchAllOrders = async () => {
+      try {
+        const ordersWithProducts = await Promise.all(
+          result.map((order) => fetchProductsForOrder(order))
+        );
+
+        return res
+          .status(200)
+          .json({ status: "success", res: ordersWithProducts });
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
       }
-      return res.status(200).json({ status: "success", res: result });
+    };
+
+    fetchAllOrders();
+  });
+});
+
+//fetch completed orders
+app.get("/api/completed_orders/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const sql = `SELECT DISTINCT *
+      FROM tblsales
+      WHERE customer_id = ${userId} 
+      GROUP BY order_id
+      ORDER BY date DESC, order_id DESC;
+      `;
+
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.error("Error fetching orders:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+
+      if (!result || result.length === 0) {
+        return res
+          .status(200)
+          .json({ status: "success", res: "No pending orders found." });
+      }
+
+      const orders = [];
+
+      // Use async function inside a loop to handle multiple queries
+      const fetchProductsForOrder = (order) => {
+        return new Promise((resolve, reject) => {
+          const productSql = `SELECT *
+                  FROM tblsales 
+                  WHERE order_id = ? 
+                  ORDER BY order_id DESC;`;
+
+          db.query(productSql, [order.order_id], (err, products) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve({ ...order, products });
+          });
+        });
+      };
+
+      const fetchAllOrders = async () => {
+        try {
+          const ordersWithProducts = await Promise.all(
+            result.map((order) => fetchProductsForOrder(order))
+          );
+
+          return res
+            .status(200)
+            .json({ status: "success", res: ordersWithProducts });
+        } catch (err) {
+          console.error("Error fetching products:", err);
+          return res
+            .status(500)
+            .json({ status: "error", message: "Internal server error" });
+        }
+      };
+
+      fetchAllOrders();
     });
   } catch (error) {
     console.error("Error fetching customer name:", error);
@@ -6184,18 +7321,158 @@ app.post("/api/orders_products/", async (req, res) => {
   }
 });
 
-// CANCELLING ORDER
-app.post("/api/cancelled_order/", async (req, res) => {
-  const { orderId } = req.body;
+//fetch deline orders
+app.get("/api/decline_orders/:userId", async (req, res) => {
   try {
-    const query = `UPDATE tblorders_customer 
-                   SET status = "Cancelled"
-                   WHERE order_id = ?`;
-    await db.query(query, [orderId], (err, result) => {
+    const userId = req.params.userId;
+
+    const sql = `SELECT DISTINCT *
+      FROM tblorders_customer
+      WHERE customer_id = ${userId} 
+        AND status = 'Decline'
+      GROUP BY order_id
+      ORDER BY date DESC, order_id DESC;
+      `;
+
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.error("Error fetching orders:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+
+      if (!result || result.length === 0) {
+        return res
+          .status(200)
+          .json({ status: "success", res: "No pending orders found." });
+      }
+
+      const orders = [];
+
+      // Use async function inside a loop to handle multiple queries
+      const fetchProductsForOrder = (order) => {
+        return new Promise((resolve, reject) => {
+          const productSql = `SELECT *
+                  FROM tblorders_customer 
+                  WHERE order_id = ? 
+                  ORDER BY order_id DESC;`;
+
+          db.query(productSql, [order.order_id], (err, products) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve({ ...order, products });
+          });
+        });
+      };
+
+      const fetchAllOrders = async () => {
+        try {
+          const ordersWithProducts = await Promise.all(
+            result.map((order) => fetchProductsForOrder(order))
+          );
+
+          return res
+            .status(200)
+            .json({ status: "success", res: ordersWithProducts });
+        } catch (err) {
+          console.error("Error fetching products:", err);
+          return res
+            .status(500)
+            .json({ status: "error", message: "Internal server error" });
+        }
+      };
+
+      fetchAllOrders();
+    });
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// fetch cancelled orders
+app.get("/api/cancelled_orders/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const sql = `SELECT DISTINCT *
+      FROM tblorders_customer
+      WHERE customer_id = ${userId} 
+        AND status = 'Cancelled'
+      GROUP BY order_id
+      ORDER BY date DESC, order_id DESC;
+      `;
+
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.error("Error fetching orders:", err);
+        return res
+          .status(500)
+          .json({ status: "error", message: "Internal server error" });
+      }
+
+      if (!result || result.length === 0) {
+        return res
+          .status(200)
+          .json({ status: "success", res: "No pending orders found." });
+      }
+
+      const orders = [];
+
+      // Use async function inside a loop to handle multiple queries
+      const fetchProductsForOrder = (order) => {
+        return new Promise((resolve, reject) => {
+          const productSql = `SELECT *
+                  FROM tblorders_customer 
+                  WHERE order_id = ? 
+                  ORDER BY order_id DESC;`;
+
+          db.query(productSql, [order.order_id], (err, products) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve({ ...order, products });
+          });
+        });
+      };
+
+      const fetchAllOrders = async () => {
+        try {
+          const ordersWithProducts = await Promise.all(
+            result.map((order) => fetchProductsForOrder(order))
+          );
+
+          return res
+            .status(200)
+            .json({ status: "success", res: ordersWithProducts });
+        } catch (err) {
+          console.error("Error fetching products:", err);
+          return res
+            .status(500)
+            .json({ status: "error", message: "Internal server error" });
+        }
+      };
+
+      fetchAllOrders();
+    });
+  } catch (error) {
+    console.error("Error fetching customer name:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/api/cancelling_order/", async (req, res) => {
+  const { orderId, remarks } = req.body;
+  try {
+    const query = `UPDATE tblorders_customer SET status = "Cancelled", remarks = ? WHERE order_id = ?`;
+    await db.query(query, [remarks, orderId], (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
         return res.status(500).json({ message: "Internal server error" });
       }
+
       return res.status(200).json({ status: "success", res: result });
     });
   } catch (error) {
@@ -6205,8 +7482,107 @@ app.post("/api/cancelled_order/", async (req, res) => {
 });
 
 /*
-CUSTOMER
-*/
+  CUSTOMER
+  */
+/*
+REPORTS
+  */
+
+app.get("/api/reports", (req, res) => {
+  const { reportType } = req.query;
+
+  let sql = "";
+  switch (reportType) {
+    case "product":
+      sql = `
+     SELECT 
+        it.itemId AS ID, 
+        it.itemName AS PRODUCT, 
+       it.price AS PRICE,  -- Formatted price
+        it.category AS CATEGORY, 
+        it.description AS DESCRIPTION, 
+        COALESCE(SUM(p.actualQuantityProduced), 0) AS QUANTITY,
+          CAST(DATE_FORMAT( p.productionDate, '%Y-%m-%d') AS CHAR) AS DATE  
+    FROM 
+        tblitems it
+    LEFT JOIN 
+        tblproduction p ON it.itemId = p.itemId
+    GROUP BY 
+        it.itemId;
+      `;
+      break;
+
+    case "rawMaterials":
+      sql = `
+        SELECT 
+          raw.matId AS ID,
+          raw.matName AS MATERIAL, 
+          raw.category AS CATEGORY, 
+          COALESCE(SUM(odi.remaining_quantity), 0) AS QUANTITY,
+          CAST(DATE_FORMAT( odi.dateReceive, '%Y-%m-%d') AS CHAR) AS DATE  
+        FROM tblrawmats raw
+        LEFT JOIN tblorderfromsupplier_items odi ON raw.matId = odi.matId
+        GROUP BY raw.matName, raw.category, raw.matId
+        ORDER BY raw.matId ASC;
+      `;
+      break;
+
+    case "suppliers":
+      sql = `
+        SELECT s.supplyId AS ID, s.supplyName AS SUPPLIER, s.contact AS CONTACT, 
+        GROUP_CONCAT(r.matName) AS PRODUCTS
+        FROM tblsuppliers s
+        LEFT JOIN tblsupplierrawmats sr ON s.supplyId = sr.supplierId
+        LEFT JOIN tblrawmats r ON sr.rawMatId = r.matId
+        GROUP BY s.supplyId;
+      `;
+      break;
+
+    case "documents":
+      sql = `
+    SELECT 
+      d.documentName AS DOCUMENT, 
+      d.category AS CATEGORY,  
+      d.description AS DESCRIPTION, 
+      CAST(DATE_FORMAT(d.dateEffective, '%Y-%m-%d') AS CHAR) AS EFFECTIVITY,  
+      CAST(DATE_FORMAT(d.expirationDate, '%Y-%m-%d') AS CHAR) AS EXPIRATION,  
+      CASE 
+          WHEN d.expirationDate IS NULL THEN 'No Expiration Date'
+          WHEN d.expirationDate < CURDATE() THEN 'Expired'
+          WHEN TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate) <= 3 THEN CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
+          ELSE CONCAT(TIMESTAMPDIFF(MONTH, CURDATE(), d.expirationDate), ' months left')
+      END AS VALIDITY
+    FROM 
+      tbldocument d
+    ORDER BY 
+      d.expirationDate ASC;
+      `;
+      break;
+
+    case "sales":
+      sql = `
+   SELECT  sl.order_id AS ID, sl.customer_name AS CUSTOMER, sl.customer_loc AS LOCATION, sl.item_name AS ITEM,   
+   sl.total_price AS TOTAL,
+   sl.mop AS MOP ,  sl.date AS DATE 
+   FROM tblsales sl 
+   ORDER BY sl.order_id;
+      `;
+      break;
+
+    default:
+      return res.status(400).send("Invalid report type");
+  }
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error(`Error fetching ${reportType} data:`, err);
+      return res.status(500).send("Error fetching report data");
+    }
+
+    res.json(results);
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server running at http://${localIP}:${port}`);
 });

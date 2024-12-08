@@ -46,7 +46,12 @@ const DoneModal = ({ isOpen, onClose, onConfirm, item }) => {
             min="1"
             max={item.quantityProduced}
             value={producedQuantity}
-            onChange={(e) => setProducedQuantity(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue >= 0 || newValue === "") {
+                setProducedQuantity(newValue)
+              }
+            }}
             placeholder="Actual produced quantity"
           />
         </div>

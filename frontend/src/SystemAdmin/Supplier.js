@@ -26,6 +26,11 @@ function Supplier() {
     key: "supplyName",
     direction: "asc",
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Adjust the items per page as needed
+
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -111,9 +116,16 @@ function Supplier() {
     setSortConfig({ key: column, direction });
   };
 
+  // Sorted and filtered suppliers
   const sortedSuppliers = supplier
-    .filter((supply) =>
-      supply.supplyName.toLowerCase().includes(searchTerm.toLowerCase())
+    .filter(
+      (supply) =>
+        supply.supplyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        supply.contact
+          .toString()
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        supply.products.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -125,6 +137,15 @@ function Supplier() {
       return 0;
     });
 
+  // Pagination logic
+  const totalPages = Math.ceil(sortedSuppliers.length / itemsPerPage);
+  const currentData = sortedSuppliers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -134,19 +155,16 @@ function Supplier() {
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Supplier</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Supplier</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
               <button className="btn" onClick={() => setAddModalOpen(true)}>
                 <i className="fa-solid fa-add"></i> Add
-              </button>
-              <button
-                className="btn"
-                id="sortButton"
-                onClick={() => handleSort("supplyName")}
-              >
-                <i className="fa-solid fa-sort"></i> Sort
               </button>
             </div>
             <div className="search-container1">
@@ -160,13 +178,16 @@ function Supplier() {
                   placeholder="Search by name or contact..."
                   size="40"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setSearchTerm(e.target.value);
+                  }}
                 />
               </div>
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
                   <th onClick={() => handleSort("supplyId")}>#</th>
@@ -176,20 +197,16 @@ function Supplier() {
                   <th>Actions</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
+
               <tbody>
-                {sortedSuppliers.map((supply, index) => (
+                {currentData.map((supply, index) => (
                   <tr key={supply.supplyId}>
-                    <td>{index + 1}</td>
+                    <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                     <td>{supply.supplyName}</td>
                     <td>{supply.contact}</td>
                     <td>{supply.products || "No products"}</td>
                     <td>
                       <div className="docubutton">
-                        {" "}
                         <button
                           className="done-btn"
                           onClick={() => openDetailsModal(supply)}
@@ -207,13 +224,32 @@ function Supplier() {
                           onClick={() => handleEditClick(supply)}
                         >
                           <i className="fa-solid fa-pen-to-square"></i>
-                        </button>{" "}
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>

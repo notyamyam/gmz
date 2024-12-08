@@ -26,7 +26,6 @@ function Preparing() {
   const openCancelModal = (order_id) => {
     setCancelModal(true);
     setOrderId(order_id);
-    console.log("==>", order_id);
   };
   const closeCancelModal = () => setCancelModal(false);
 
@@ -110,7 +109,6 @@ function Preparing() {
     try {
       const res = await axios.get(`${apiUrl}/mycart/${userId}`);
       if (res.data.status === "success") {
-        console.log(res.data.res);
         setCartItems(res.data.res);
       } else {
         throw new Error("No products found.");
@@ -124,7 +122,6 @@ function Preparing() {
     try {
       const res = await axios.get(`${apiUrl}/orders_preparing/${userId}`);
       if (res.data.status === "success") {
-        console.log("PREPARING ORDERS: ", res.data.res);
         setOrderProd(res.data.res);
       } else {
         throw new Error("No orders found.");
@@ -143,7 +140,6 @@ function Preparing() {
 
       if (res.data.status === "success") {
         setViewOrder(res.data.res);
-        console.log(res.data.res);
       } else {
         throw new Error("No order products found.");
       }
@@ -156,7 +152,6 @@ function Preparing() {
     try {
       const res = await axios.get(`${apiUrl}/fetchmop/`);
       if (res.data.status === "success") {
-        console.log(res.data.res);
         setMopArray(res.data.res); // Populate the MOP array with data
       } else {
         throw new Error("No modes of payment found.");
@@ -180,7 +175,6 @@ function Preparing() {
       const res = await axios.delete(`${apiUrl}/remove-prod-cart`, {
         data: { item_id, user_id: userId },
       });
-      console.log(res.data);
       fetchMyCart();
     } catch (error) {
       console.log(error);
@@ -278,7 +272,6 @@ function Preparing() {
         alert("Failed to place order.");
       }
     } catch (error) {
-      console.log("INSERTING DATA : ", insertCartData);
 
       console.error("Error placing order:", error);
       alert("Error placing order.", error);
@@ -308,7 +301,6 @@ function Preparing() {
         fetchPreparing();
       }
     } catch (error) {
-      console.log(error);
       alert("Checkout failed. Please try again.");
     }
   };

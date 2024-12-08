@@ -10,7 +10,7 @@ import moment from "moment"; // Import moment to format dates
 function Header() {
   const navigate = useNavigate();
   const [isNotificationOpen, setNotificationOpen] = useState(false);
-  const [isUserDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isLogoutModalOpen, setLogoutModalOpen] = useState(false); // State for logout modal
   const notificationDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
   const [username, setUsername] = useState(localStorage.getItem("username"));
@@ -20,15 +20,13 @@ function Header() {
   // Fetch notifications with a limit of 10
   const fetchNotifications = async () => {
     try {
-      await axios.get(`${apiUrl}/documents/notifications`); // Insert notifications into DB (if necessary)
+      await axios.get(`${apiUrl}/documents/notifications`);
     } catch (error) {
       console.error("Error inserting notifications:", error);
     }
 
     try {
-      const response = await axios.get(
-        `${apiUrl}/documents/getnotifications?limit=10`
-      );
+      const response = await axios.get(`${apiUrl}/documents/getnotifications`);
       setNotifications(response.data);
       setUnreadCount(
         response.data.filter((notif) => notif.status === 0).length
@@ -40,17 +38,7 @@ function Header() {
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
-
-  // Handle logout
-  async function handleLogout() {
-    try {
-      await axios.post(`${apiUrl}/auth/logout`);
-      navigate("/");
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  }
+  }, [notifications]);
 
   // Handles clicking outside dropdowns to close them
   useEffect(() => {
@@ -65,7 +53,7 @@ function Header() {
         userDropdownRef.current &&
         !userDropdownRef.current.contains(event.target)
       ) {
-        setUserDropdownOpen(false);
+        setLogoutModalOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -84,6 +72,22 @@ function Header() {
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
+  };
+
+  // Show logout confirmation modal
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
+  // Handle logout confirmation
+  const handleLogoutConfirmation = () => {
+    localStorage.clear(); // Clear localStorage
+    window.location.reload(); // Reload the page to reset the session
+  };
+
+  // Handle canceling logout
+  const handleLogoutCancel = () => {
+    setLogoutModalOpen(false); // Close the modal
   };
 
   return (
@@ -109,26 +113,15 @@ function Header() {
           )}
         </button>
 
-        {/* User Button */}
+        {/* User Button (Logout directly) */}
         <button
           type="button"
           className="icon-button"
           id="userButton"
-          onClick={() => setUserDropdownOpen(!isUserDropdownOpen)}
+          onClick={handleLogoutClick}
         >
           <FontAwesomeIcon icon={faUser} />
         </button>
-
-        {/* User Dropdown */}
-        {isUserDropdownOpen && (
-          <div className="dropdown-user" ref={userDropdownRef}>
-            <a href="#">Profile</a>
-            <a href="#">Settings</a>
-            <a href="#" onClick={handleLogout}>
-              Log Out
-            </a>
-          </div>
-        )}
       </div>
 
       {/* Bootstrap Modal for Notifications */}
@@ -142,8 +135,12 @@ function Header() {
         <div className="modal-dialog-xl">
           <div className="modal-content">
             <div className="modal-header">
-              <h5 className="modal-title" id="notificationModalLabel">
-                Notifications
+              <h5
+                className="modal-title"
+                id="notificationModalLabel"
+                style={{ color: "gray" }}
+              >
+                <strong>Notifications</strong>
               </h5>
               <button
                 type="button"
@@ -204,6 +201,36 @@ function Header() {
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <div className="modal show" tabIndex="-1" style={{ display: "block" }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-body">
+                <h6>Are you sure you want to log out?</h6>
+              </div>
+              <div className="d-flex w-100 justify-content-end">
+                <button
+                  type="button"
+                  style={{ backgroundColor: "white", color: "gray" }}
+                  onClick={handleLogoutCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ backgroundColor: "red", color: "white" }}
+                  onClick={handleLogoutConfirmation}
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

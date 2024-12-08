@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../css/AddItemModal.css";
 import apiUrl from "../ApiUrl/apiUrl";
+import { toast } from "react-toastify";
 
 const AddItemModal = ({ isOpen, onClose, onAdd }) => {
   const [itemName, setItemName] = useState("");
@@ -21,7 +22,9 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
 
   const fetchData = async () => {
     try {
-      const categoryResponse = await axios.get(`${apiUrl}/categories/inventory`);
+      const categoryResponse = await axios.get(
+        `${apiUrl}/categories/inventory`
+      );
       setCategories(categoryResponse.data);
 
       const materialResponse = await axios.get(`${apiUrl}/rawmats`);
@@ -33,8 +36,13 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
 
   const handleAddMaterial = () => {
     if (!selectedMaterial) return;
-    const material = materialList.find((mat) => mat.matId === Number(selectedMaterial));
-    if (material && !addedMaterials.some((mat) => mat.matId === material.matId)) {
+    const material = materialList.find(
+      (mat) => mat.matId === Number(selectedMaterial)
+    );
+    if (
+      material &&
+      !addedMaterials.some((mat) => mat.matId === material.matId)
+    ) {
       setAddedMaterials([...addedMaterials, material]);
     }
     setSelectedMaterial("");
@@ -46,15 +54,26 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newItem = {
-      itemName,
-      price,
-      category,
-      description,
-      materials: addedMaterials.map((mat) => mat.matId),
-    };
-    onAdd(newItem);
-    onClose();
+    console.log(addedMaterials.length);
+    if (addedMaterials.length == 0) {
+      toast.error("Materials is required!");
+    } else {
+      const newItem = {
+        itemName,
+        price,
+        category,
+        description,
+        materials: addedMaterials.map((mat) => mat.matId),
+      };
+      onAdd(newItem);
+      setItemName("");
+      setPrice("");
+      setDescription("");
+      setCategory("");
+      setSelectedMaterial("");
+      setAddedMaterials([]);
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -62,7 +81,10 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
   return (
     <div id="addModal" className="modal-overlay">
       <div className="modal-content">
-        <h2>Add New Item</h2>
+        <h2 style={{ color: "gray" }}>
+          {" "}
+          <strong>Add New Item</strong>
+        </h2>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -75,9 +97,15 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
             type="number"
             placeholder="Price"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue >= 0 || newValue === "") {
+                setPrice(newValue);
+              }
+            }}
             required
           />
+
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -92,9 +120,9 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
               </option>
             ))}
           </select>
-          <div>
-            <h4>Materials/Ingredients</h4>
-            <div className="d-flex">
+          <div className="mt-2 gap-2">
+            <h5 style={{ color: "gray" }}>Materials/Ingredients</h5>
+            <div className="d-flex gap-2">
               <select
                 value={selectedMaterial}
                 onChange={(e) => setSelectedMaterial(e.target.value)}
@@ -116,7 +144,10 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
               {addedMaterials.map((mat) => (
                 <li key={mat.matId}>
                   {mat.matName}
-                  <button type="button" onClick={() => handleRemoveMaterial(mat.matId)}>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMaterial(mat.matId)}
+                  >
                     Remove
                   </button>
                 </li>
@@ -125,14 +156,30 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
           </div>
           <textarea
             placeholder="Description"
+            className="form-control"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
           />
-          <button type="submit">Add Item</button>
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
+          <div className="mt-2 d-flex w-100 justify-content-end gap-2">
+            {" "}
+            <button
+              type="button"
+              style={{ backgroundColor: "white", color: "black" }}
+              onClick={() => {
+                setItemName("");
+                setPrice("");
+                setDescription("");
+                setCategory("");
+                setSelectedMaterial("");
+                setAddedMaterials([]);
+                onClose();
+              }}
+            >
+              Cancel
+            </button>
+            <button type="submit">Add Item</button>
+          </div>
         </form>
       </div>
     </div>

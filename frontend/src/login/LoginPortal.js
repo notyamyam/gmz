@@ -76,10 +76,7 @@ const LoginPortal = () => {
                     required
                   />
                 </div>
-                <div className="input-container">
-                  <input type="checkbox" id="rememberMe" />
-                  <label htmlFor="rememberMe">Remember me</label>
-                </div>
+                  
                 <br />
                 <input type="submit" value="Login" />
                 <a href="/register" class="btn-done" >Register here</a>

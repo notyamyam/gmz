@@ -171,7 +171,7 @@ body {
 /*---SEARCH SIDE---*/
 .above-table {
   display: flex;
-  align-items: center; /* Aligns items vertically */
+  justify-content: space-between;
 }
 
 .above-table-wrapper {
@@ -185,6 +185,7 @@ body {
   align-items: center;
   margin-left: auto;
   gap: 5px; /* Adjusts space between items */
+  justify-content: space-between;
 }
 
 .search-container1 i {
@@ -284,6 +285,11 @@ thead th {
   background-color: #ff2828; /*REDORANGE*/
 }
 
+.table thead th {
+  background-color: #ff2828;
+  color: white;
+}
+
 tr:hover {
   background-color: #f1f1f1;
 }
@@ -320,6 +326,19 @@ tr:hover {
 .done-btn {
   background-color: #32cd32;
   color: white;
+  padding: 10px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  text-align: center;
+  width: 50px;
+}
+
+
+.view-btn {
+  background-color: #ff7d00;
+  color: black;
   padding: 10px 10px;
   border: none;
   border-radius: 5px;
@@ -441,8 +460,8 @@ input[type="checkbox"] {
   padding: 30px;
   border-radius: 12px; /* Softer, rounded corners */
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
-  width: 80%;
-  max-width: 500px; /* Slightly smaller for a neater look */
+  width: 100%;
+  max-width: 600px; /* Slightly smaller for a neater look */
   position: relative;
   animation: fadeIn 0.5s ease-in-out;
 }
@@ -787,12 +806,12 @@ select:hover {
   align-items: center;
   margin-top: 20px; /* Add margin at the top */
   padding: 10px;
-  background-color: #f1f1f1; /* Light background color for better visibility */
+
   border-radius: 5px; /* Rounded corners */
 }
 
 .pagination button {
-  background-color: #007bff; /* Blue background color for buttons */
+  background-color: red ; /* Blue background color for buttons */
   color: white; /* White text */
   border: none;
   padding: 10px 20px;
@@ -808,7 +827,7 @@ select:hover {
 }
 
 .pagination button:hover:not(:disabled) {
-  background-color: #0056b3; /* Darker blue when hovered */
+  background-color: red; /* Darker blue when hovered */
 }
 
 .pagination span {

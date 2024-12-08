@@ -19,11 +19,19 @@ const Sidebar = () => {
         <img src={gmzlogo} width="85" height="75" alt="Logo" />
       </h2>
       <ul>
-        <li>
+        {/* <li>
           <Link to="/customer/dashboard">Dashboard</Link>
-        </li>
+        </li> */}
         <li>
           <Link to="/customer/orders">Orders</Link>
+        </li>
+
+        <li>
+          <Link to="/customer/completed">Completed Orders</Link>
+        </li>
+
+        <li>
+          <Link to="/customer/declined">Declined Orders</Link>
         </li>
 
         <li>

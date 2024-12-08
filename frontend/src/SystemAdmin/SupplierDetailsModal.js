@@ -28,7 +28,9 @@ function SupplierDetailsModal({ isOpen, onClose, supplier }) {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Supplier Products for {supplier.supplyName}</h2>
+        <h2 style={{ color: "gray" }}>
+          <strong>Supplier Products for {supplier.supplyName}</strong>
+        </h2>
         <table>
           <thead>
             <tr>
@@ -47,7 +49,13 @@ function SupplierDetailsModal({ isOpen, onClose, supplier }) {
                 <tr key={detail.rawMatId}>
                   <td>{index + 1}</td>
                   <td>{detail.matName}</td>
-                  <td>₱ {detail.price.toFixed(2)}</td>
+
+                  <td>
+                    {new Intl.NumberFormat("en-PH", {
+                      style: "currency",
+                      currency: "PHP",
+                    }).format(detail.price)}
+                  </td>
                 </tr>
               ))
             )}

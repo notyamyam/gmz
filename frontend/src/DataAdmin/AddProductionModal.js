@@ -71,12 +71,15 @@ function AddProductionModal({ isOpen, onClose, items, onAdd }) {
               type="number"
               name="quantityProduced"
               value={production.quantityToProduce}
-              onChange={(e) =>
-                setProduction({
-                  ...production,
-                  quantityToProduce: e.target.value,
-                })
-              }
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (newValue >= 0 || newValue === "") {
+                  setProduction({
+                    ...production,
+                    quantityToProduce: newValue,
+                  });
+                }
+              }}
               required
             />
           </div>

@@ -7,6 +7,8 @@ import moment from "moment";
 import EditOrderModal from "./EditOrderModal";
 import apiUrl from "../ApiUrl/apiUrl";
 
+import style from "./ReadyToGo.module.css";
+
 //toast
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,11 +30,63 @@ function ReadyToGo() {
   const [orders, setOrders] = useState([]);
   const [productss, setProductss] = useState([]);
 
+  // Paginate the items based on currentPage
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [item, setItem] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+  const currentItems = searchQuery
+    ? filteredOrders.slice(indexOfFirstItem, indexOfLastItem)
+    : couriers.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(
+    (searchQuery ? filteredOrders.length : couriers.length) / itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSearch = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(event.target.value);
+    if (query === "") {
+      setFilteredOrders([]); // Reset to show all data
+    } else {
+      const filtered = item.filter((item) => {
+        const courierName = item.rider ? item.rider.toLowerCase() : "";
+        const vehiclePlate = item.vehicle_plate
+          ? item.vehicle_plate.toLowerCase()
+          : "";
+        const vehicleType = item.vehicle_type
+          ? item.vehicle_type.toLowerCase()
+          : "";
+
+        return (
+          courierName.includes(query) ||
+          vehiclePlate.includes(query) ||
+          vehicleType.includes(query)
+        );
+      });
+      setFilteredOrders(filtered);
+    }
+    setCurrentPage(1);
+  };
+
   const fetchCourierReady = async () => {
     try {
       const res = await axios.get(`${apiUrl}/courier_ready`); // Adjust the URL if necessary
-      console.log("res", res.data.res);
-      setCouriers(res.data.res);
+      console.log(res);
+      if (Array.isArray(res.data.res)) {
+        setCouriers(res.data.res);
+        setItem(res.data.res);
+      } else {
+        console.log("Expected an array but got:", res.data.res);
+        setCouriers([]);
+        setItem([]);
+      }
       // setOrders(res.data.res.ordersWithProducts);
     } catch (error) {
       console.error("Error fetching data: ", error);
@@ -40,11 +94,12 @@ function ReadyToGo() {
   };
 
   useEffect(() => {
-    fetchCourierReady();
-  }, []);
+    if (!searchQuery) {
+      fetchCourierReady();
+    }
+  }, [couriers, searchQuery]);
 
   const openOrderModal = (data) => {
-    console.log("ORDERS: ", data);
     setOrders(data);
     setViewOrderModel(true);
     setRefNo(data.refNo);
@@ -52,8 +107,8 @@ function ReadyToGo() {
   };
 
   const openProductModal = (data) => {
-    console.log("PRODUCTS NG ORDER: ", data);
     setProductss(data);
+    setOrderId(data[0].order_id);
     setViewProductModel(true);
   };
 
@@ -80,16 +135,11 @@ function ReadyToGo() {
       <div className="main-content">
         <div className="d-flex w-100 justify-content-start">
           <h4>
-            <strong>READY TO GO COURIER</strong>
+            <strong style={{ color: "gray" }}>READY TO PICKUP</strong>
           </h4>
         </div>
         <div className="info">
           <div className="above-table">
-            <div className="above-table-wrapper">
-              <button className="btn" id="sortButton">
-                <i className="fa-solid fa-sort"></i> Sort
-              </button>
-            </div>
             <div className="search-container1">
               <div className="search-wrapper">
                 <label>
@@ -100,12 +150,9 @@ function ReadyToGo() {
                   className="search-input"
                   placeholder="Search..."
                   size="40"
+                  value={searchQuery}
+                  onChange={handleSearch}
                 />
-              </div>
-              <div>
-                <button id="searchButton" className="btn">
-                  Search
-                </button>
               </div>
             </div>
           </div>
@@ -131,10 +178,10 @@ function ReadyToGo() {
           </div> */}
 
           <div className="table-list">
-            <table className="table">
+            <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th>Driver Name</th>
+                  <th>Courier Name</th>
                   <th>Vehicle</th>
                   <th>Vehicle Plate</th>
                   <th>Action</th>
@@ -143,10 +190,12 @@ function ReadyToGo() {
               <tbody>
                 {couriers?.length === 0 ? (
                   <tr>
-                    <td colSpan="6">NO COURIERS ARE AVAILABLE TO PROCEED.</td>
+                    <td colSpan="6">
+                      <strong>NO COURIERS</strong> TO PROCEED.
+                    </td>
                   </tr>
                 ) : (
-                  couriers?.map((couriers, index) => (
+                  currentItems?.map((couriers, index) => (
                     <tr key={index}>
                       <td className="text-start align-middle ">
                         <span className="me-2">{couriers.rider}</span>
@@ -163,7 +212,6 @@ function ReadyToGo() {
                           <button
                             className={` btn btn-primary d-flex align-items-center justify-content-center`}
                             onClick={() => {
-                              console.log(couriers.vehicle_plate);
                               openOrderModal(couriers.orders);
                               setUserId(couriers.userId);
                               setOrderId(couriers.order_id);
@@ -185,13 +233,30 @@ function ReadyToGo() {
               </tbody>
             </table>
           </div>
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
       {/* VIEW ORDERS OF RIDERS */}
       {viewOrderModel && (
         <div className="modal-overlay">
-          <div className={`modal-content d-flex justify-content-between w-100`}>
-            <div class="modal-header d-flex w-100 justify-content-between">
+          <div className={`${style["modalContent"]} d-flex flex-column w-100 `}>
+            <div class="d-flex w-100 justify-content-between">
               <h5>
                 <strong>Carried Orders</strong>
               </h5>
@@ -202,67 +267,69 @@ function ReadyToGo() {
               ></button>
             </div>
 
-            <div className="overflow-hidden">
-              <div className={`table-list w-100`}>
-                <table className="table">
-                  <thead>
+            <div className="table-list">
+              <table className="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>Order Id</th>
+                    <th>Customer Name</th>
+                    <th>Deliver to</th>
+                    <th>Total Price</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders?.length === 0 ? (
                     <tr>
-                      <th>Order Id</th>
-                      <th>Deliver to</th>
-                      <th>Total Price</th>
-                      <th>Action</th>
+                      <td colSpan="6">NO ORDERS FOUND.</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {orders?.length === 0 ? (
-                      <tr>
-                        <td colSpan="6">NO ORDERS FOUND.</td>
+                  ) : (
+                    orders?.map((order, index) => (
+                      <tr key={index}>
+                        <td className="w-25 text-start align-middle">
+                          {order.order_id}
+                        </td>
+                        <td className="w-25 text-start align-middle">
+                          {order.customer_name}
+                        </td>
+                        <td className="w-25 text-start align-middle">
+                          {order.customer_loc}
+                        </td>
+                        <td className="align-middle">
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                          }).format(order.total_sum_price)}
+                        </td>
+                        <td className="align-middle">
+                          <button
+                            className={` btn btn-danger d-flex align-items-center justify-content-center`}
+                            onClick={() => {
+                              openProductModal(order.products);
+                            }}
+                          >
+                            <i
+                              className="fa fa-eye"
+                              style={{ fontSize: "15px" }}
+                            ></i>
+                          </button>
+                        </td>
                       </tr>
-                    ) : (
-                      orders?.map((order, index) => (
-                        <tr key={index}>
-                          <td className="w-25 text-start align-middle">
-                            {order.order_id}
-                          </td>
-                          <td className="w-25 text-start align-middle">
-                            {order.customer_loc}
-                          </td>
-                          <td className="align-middle">
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(order.total_sum_price)}
-                          </td>
-                          <td className="align-middle">
-                            <button
-                              className={` btn btn-danger d-flex align-items-center justify-content-center`}
-                              onClick={() => {
-                                openProductModal(order.products);
-                              }}
-                            >
-                              <i
-                                className="fa fa-eye"
-                                style={{ fontSize: "15px" }}
-                              ></i>
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                    ))
+                  )}
+                </tbody>
+              </table>
 
-                <div className="d-flex w-100 justify-content-end gap-2">
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      // setChooseVehicle(true);
-                      handleStatusTransit();
-                    }}
-                  >
-                    <span>Confirm</span>
-                  </button>
-                </div>
+              <div className="d-flex w-100 justify-content-end gap-2">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    // setChooseVehicle(true);
+                    handleStatusTransit();
+                  }}
+                >
+                  <span>Confirm</span>
+                </button>
               </div>
             </div>
           </div>
@@ -270,7 +337,7 @@ function ReadyToGo() {
       )}
       {viewProductModel && (
         <div className="modal-overlay">
-          <div className={`modal-content d-flex justify-content-between w-100`}>
+          <div className={`${style["modalContent"]} d-flex flex-column w-100`}>
             <div class="modal-header d-flex w-100 justify-content-between">
               <h5>
                 <strong>Product Orders</strong> | {orderId}
@@ -282,53 +349,51 @@ function ReadyToGo() {
               ></button>
             </div>
 
-            <div className="overflow-hidden">
-              <div className={`table-list w-100`}>
-                <table className="table">
-                  <thead>
+            <div className={`table-list w-100`}>
+              <table className="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Total Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productss?.length === 0 ? (
                     <tr>
-                      <th>Item Name</th>
-                      <th>Description</th>
-                      <th>Price</th>
-                      <th>Quantity</th>
-                      <th>Total Price</th>
+                      <td colSpan="6">NO PRODUCTS FOUND.</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {productss?.length === 0 ? (
-                      <tr>
-                        <td colSpan="6">NO PRODUCTS FOUND.</td>
+                  ) : (
+                    productss?.map((productss, index) => (
+                      <tr key={index}>
+                        <td className="w-25 text-start align-middle">
+                          {productss.item_name}
+                        </td>
+                        <td className="w-25 text-start align-middle">
+                          {productss.description}
+                        </td>
+                        <td className="align-middle">
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                          }).format(productss.price)}
+                        </td>
+                        <td className="w-25 text-start align-middle">
+                          {productss.quantity}
+                        </td>
+                        <td className="align-middle">
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                          }).format(productss.total_price)}
+                        </td>
                       </tr>
-                    ) : (
-                      productss?.map((productss, index) => (
-                        <tr key={index}>
-                          <td className="w-25 text-start align-middle">
-                            {productss.item_name}
-                          </td>
-                          <td className="w-25 text-start align-middle">
-                            {productss.description}
-                          </td>
-                          <td className="align-middle">
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(productss.price)}
-                          </td>
-                          <td className="w-25 text-start align-middle">
-                            {productss.quantity}
-                          </td>
-                          <td className="align-middle">
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(productss.total_price)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

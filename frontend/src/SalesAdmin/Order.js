@@ -6,13 +6,18 @@ import axios from "axios";
 import moment from "moment";
 import apiUrl from "../ApiUrl/apiUrl";
 
+import style from "./Order.module.css";
+
+// toast
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 function Order() {
   const [orders, setOrders] = useState([]);
   const [paginatedOrders, setPaginatedOrders] = useState([]); // Orders for the current page
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10; // You can adjust this number
 
   const [userId, setUserId] = useState("");
@@ -26,7 +31,61 @@ function Order() {
   const [viewPendingModal, setViewPendingModal] = useState(false);
   const [viewPendingOrders, setViewPendingOrders] = useState([]);
 
-  const [chooseRiderModal, setChooseRiderModal] = useState(false);
+  const [remarks, setRemarks] = useState("");
+  const [reasonModal, setReasonModal] = useState(false);
+
+  // Paginate the items based on currentPage
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [item, setItem] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+  const currentItems = searchQuery
+    ? filteredOrders.slice(indexOfFirstItem, indexOfLastItem)
+    : pendingOrders.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(
+    (searchQuery ? filteredOrders.length : pendingOrders.length) / itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSearch = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(event.target.value);
+    if (query === "") {
+      setFilteredOrders([]); // Reset to show all data
+    } else {
+      const filtered = item.filter((item) => {
+        const orderId = item.order_id ? item.order_id.toLowerCase() : "";
+        const mop = item.mop ? item.mop.toLowerCase() : "";
+        const customerName = item.customer_name
+          ? item.customer_name.toLowerCase()
+          : "";
+        const customerLoc = item.customer_loc
+          ? item.customer_loc.toLowerCase()
+          : "";
+        const date = item.date ? item.date.toLowerCase() : "";
+        const totalSumPrice = item.total_sum_price
+          ? item.total_sum_price.toString().toLowerCase()
+          : "";
+
+        return (
+          orderId.includes(query) ||
+          mop.includes(query) ||
+          customerName.includes(query) ||
+          customerLoc.includes(query) ||
+          date.includes(query) ||
+          totalSumPrice.includes(query)
+        );
+      });
+      setFilteredOrders(filtered);
+    }
+    setCurrentPage(1);
+  };
 
   const openViewPendingOrders = (data) => {
     setViewPendingOrders(data);
@@ -47,9 +106,20 @@ function Order() {
   const fetchPendingOrders = async () => {
     try {
       const res = await axios.get(`${apiUrl}/pending_Orders`);
-      console.log(res);
-      setPendingOrders(res.data.res);
-      console.log("=====>: ", res);
+      console.log(res.data.res);
+      if (res.data.status === "success") {
+        // Check if res.data.res is an array and set it to state
+        if (Array.isArray(res.data.res)) {
+          setPendingOrders(res.data.res);
+          setItem(res.data.res);
+        } else {
+          console.log("Expected an array but got:", res.data.res);
+          setPendingOrders([]); // If it's not an array, set an empty array
+          setItem([]);
+        }
+      } else {
+        console.log("PREPARING ORDERS: ", res.data.res);
+      }
     } catch (error) {
       console.error("Error fetching orders:", error.message);
     }
@@ -73,95 +143,68 @@ function Order() {
   // };
 
   useEffect(() => {
-    fetchPendingOrders();
-  }, [orders]);
-
-  useEffect(() => {
-    // Paginate orders when orders or currentPage change
-    const indexOfLastOrder = currentPage * ordersPerPage;
-    const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
-    const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
-    setPaginatedOrders(currentOrders);
-  }, [orders, currentPage]);
+    if (!searchQuery) {
+      fetchPendingOrders();
+    }
+  }, [pendingOrders, searchQuery]);
 
   const handlePreparing = async (orderId) => {
     try {
-      const res = await axios.post(`${apiUrl}/status_preparing/`, {
-        orderId,
-      });
+      const res = await axios.post(`${apiUrl}/status_preparing/`, { orderId });
 
-      if (res.data.status === "success") {
+      console.log("res:", res);
+
+      if (res.status === 400) {
+        let errorMessage = res.data.message;
+
+        // Replace <br> with newline characters to make it compatible with the alert box
+        errorMessage = errorMessage.replace(/<br>/g, "\n");
+
+        // Display the message using the native alert
+        alert(errorMessage);
+      } else if (res.data.status === "success") {
+        toast.success("Order accepted, proceed to preparing.");
         setViewPendingModal(false);
         fetchPendingOrders();
       } else {
-        throw new Error("No order products found.");
+        throw new Error("Unexpected response from server.");
+      }
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        let errorMessage = error.response.data.message;
+
+        // Replace <br> tags with newline characters
+        errorMessage = errorMessage.replace(/<br>/g, "\n");
+
+        alert(errorMessage);
+      } else {
+        console.log("==>", error);
+        alert("An error occurred while processing the order.");
+      }
+    }
+  };
+
+  const handleDeclineOrder = async () => {
+    console.log("ORDER: ", orderId);
+    console.log("REMARKS: ", remarks);
+
+    try {
+      const res = await axios.post(`${apiUrl}/decline_order/`, {
+        orderId,
+        remarks,
+      });
+
+      if (res.data.status === "success") {
+        toast.success("Order declined successfully.");
+        setRemarks("");
+        setReasonModal(false);
+        setViewPendingModal(false);
+        fetchPendingOrders();
+      } else {
+        throw new Error("Declining order error.");
       }
     } catch (error) {
       console.log(error);
-    }
-  };
-
-  const handleAddOrder = async (newOrder, orderProductsData) => {
-    try {
-      // Combine order details and products into one request
-      const response = await axios.post(`${apiUrl}/orders`, {
-        ...newOrder,
-        orderProducts: orderProductsData,
-      });
-
-      fetchOrders();
-    } catch (error) {
-      console.error("Error adding order:", error);
-    }
-  };
-
-  const handleEditOrder = (order) => {
-    setSelectedOrder(order);
-    setEditModalOpen(true);
-  };
-
-  const handleUpdateOrder = async (updatedOrder) => {
-    try {
-      // Send the merged data in the PUT request
-      await axios.put(`${apiUrl}/orders/${updatedOrder.orderId}`, updatedOrder);
-
-      // Update the local orders state
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order.orderId === updatedOrder.orderId ? updatedOrder : order
-        )
-      );
-
-      // Close the modal and refresh the orders list
-      setEditModalOpen(false);
-      fetchOrders();
-    } catch (error) {
-      console.error("Error updating order:", error);
-    }
-  };
-
-  const handleDeleteOrder = async (orderId) => {
-    if (window.confirm("Are you sure you want to delete this order?")) {
-      try {
-        await axios.delete(`${apiUrl}/orders/${orderId}`);
-        setOrders((prevOrders) =>
-          prevOrders.filter((order) => order.orderId !== orderId)
-        );
-      } catch (error) {
-        console.error("Error deleting order:", error);
-      }
-    }
-  };
-
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < Math.ceil(orders.length / ordersPerPage)) {
-      setCurrentPage(currentPage + 1);
     }
   };
 
@@ -172,16 +215,11 @@ function Order() {
       <div className="main-content">
         <div className="d-flex w-100 justify-content-start">
           <h4>
-            <strong>Orders</strong>
+            <strong style={{ color: "gray" }}>Orders</strong>
           </h4>
         </div>
         <div className="info">
-          {/* <div className="above-table">
-            <div className="above-table-wrapper">
-              <button className="btn" onClick={() => setAddModalOpen(true)}>
-                <i className="fa-solid fa-add"></i> Add
-              </button>
-            </div>
+          <div className="above-table">
             <div className="search-container1">
               <div className="search-wrapper">
                 <label>
@@ -190,125 +228,15 @@ function Order() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="Search..."
+                  placeholder="Search"
                   size="40"
+                  value={searchQuery}
+                  onChange={handleSearch}
                 />
               </div>
             </div>
           </div>
-          <div className="t-head">
-            <table className="table-head">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Customer</th>
-                  <th>Order Date</th>
-                  <th>Location</th>
-                  <th>Mode of Payment</th>
-                  <th>Payment Status</th>
-                  <th>Status</th>
-                  <th>Items</th>
-                  <th>Price</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
-              <tbody>
-                {paginatedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan="10" style={{ textAlign: "center" }}>
-                      No orders found.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedOrders.map((order, index) => {
-                    const itemNames = order.itemNames
-                      ? order.itemNames.split(", ")
-                      : [];
-                    const itemQuantities = order.quantities
-                      ? order.quantities.split(", ")
-                      : [];
-                    const batch = order.quantities
-                      ? order.quantities.split(", ")
-                      : [];
-                    const itemsArray = itemNames.map((name, i) => ({
-                      itemName: name,
-                      quantity: itemQuantities[i] || "Unknown quantity",
-                      batch: batch,
-                    }));
-
-                    return (
-                      <tr key={order.orderId}>
-                        <td>{index + 1}</td>
-                        <td>{order.customerName}</td>
-                        <td>{moment(order.date).format("MM-DD-YYYY")}</td>
-                        <td>{order.location}</td>
-                        <td>{order.modeOfPayment}</td>
-                        <td>{order.paymentStatus}</td>
-                        <td>{order.status}</td>
-                        <td>
-                          {itemsArray.length > 0 ? (
-                            <ul>
-                              {itemsArray.map((item, i) => (
-                                <li key={i}>
-                                  {item.itemName} - Batch#{item.batch} (
-                                  {item.quantity})
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            "No items listed"
-                          )}
-                        </td>
-                        <td>₱{order.price}</td>
-                        <td className="button-container1">
-                          <button
-                            className="edit-btn"
-                            onClick={() => handleEditOrder(order)}
-                          >
-                            <i className="fa-solid fa-edit"></i>
-                          </button>
-                          <button
-                            className="btn"
-                            onClick={() => handleDeleteOrder(order.orderId)}
-                          >
-                            <i className="fa-solid fa-trash-can"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div> */}
-          {/* Pagination Controls */}
-          {/* <div className="pagination">
-            <button
-              className="btn"
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-            >
-              <i className="fa-solid fa-chevron-left"></i> Prev
-            </button>
-            <span>
-              Page {currentPage} of {Math.ceil(orders.length / ordersPerPage)}
-            </span>
-            <button
-              className="btn"
-              onClick={handleNextPage}
-              disabled={
-                currentPage === Math.ceil(orders.length / ordersPerPage)
-              }
-            >
-              Next <i className="fa-solid fa-chevron-right"></i>
-            </button>
-          </div> */}
-
-          <div className="table-list">
+          <div className="table-list overflow-hidden">
             <table className="table">
               <thead>
                 <tr>
@@ -324,22 +252,16 @@ function Order() {
                 {pendingOrders.length === 0 ? (
                   <tr>
                     <td colSpan="6">
-                      NO PENDING ORDERS PLACED. PENDING ORDERS IS "0"
+                      NO <strong>PENDING ORDERS</strong> PLACED.
                     </td>
                   </tr>
                 ) : (
-                  pendingOrders.map((pendingOrders, index) => (
+                  currentItems.map((pendingOrders, index) => (
                     <tr key={index}>
                       <td className="text-start align-middle ">
                         <span className="me-2">{pendingOrders.order_id}</span>
                         <strong className="me-2">
                           <i>{pendingOrders.mop}</i>
-                        </strong>
-                        <strong className="me-2">
-                          <i>{pendingOrders.status}</i>
-                        </strong>
-                        <strong>
-                          <i>{pendingOrders.ref_no}</i>
                         </strong>
                       </td>
                       <td className="text-start align-middle ">
@@ -386,15 +308,29 @@ function Order() {
               </tbody>
             </table>
           </div>
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
-
       {/* VIEW PENDING PRODUCTS OF ORDERS */}
       {viewPendingModal && (
         <div className="modal-overlay">
-          <div
-            className={`modal-content d-flex justify-content-between w-100`}
-          >
+          <div className={`${style["modalContent"]} d-flex flex-column w-100`}>
             <div class="modal-header d-flex w-100 justify-content-between">
               <h5>
                 <strong>Ordered Products</strong>
@@ -420,7 +356,7 @@ function Order() {
             </div>
             <div className="overflow-hidden">
               <div className={`table-list w-100`}>
-                <table className="table">
+                <table className="table table-bordered">
                   <thead>
                     <tr>
                       <th>Item name</th>
@@ -464,7 +400,12 @@ function Order() {
                 </table>
 
                 <div className="d-flex w-100 justify-content-end gap-2">
-                  <button className="btn btn-danger">Decline</button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => setReasonModal(true)}
+                  >
+                    Decline
+                  </button>
                   <button
                     className="btn btn-success"
                     onClick={() => {
@@ -479,6 +420,49 @@ function Order() {
           </div>
         </div>
       )}
+      {reasonModal && (
+        <div className="modal-overlay">
+          <div
+            className={`${style["modalConfirm"]} d-flex flex-column justify-content-between w-100`}
+          >
+            <div class="modal-header d-flex w-100 justify-content-between">
+              <h5>
+                <strong>Declining an Order</strong>
+              </h5>
+              <button
+                type="button"
+                className="btn-close bg-light"
+                onClick={() => {
+                  setReasonModal(false);
+                }}
+              ></button>
+            </div>
+
+            <div className="d-flex flex-column w-100">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleDeclineOrder();
+                }}
+              >
+                <span>Input reason to decline an order:</span>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  required
+                />
+
+                <div className="d-flex w-100 mt-2 justify-content-end">
+                  <button className="btn btn-danger">Submit</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      <ToastContainer />;
     </div>
   );
 }

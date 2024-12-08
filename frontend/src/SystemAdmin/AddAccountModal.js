@@ -39,7 +39,9 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Add New Account</h2>
+        <h2 style={{ color: "gray" }}>
+          <strong>Add New Account</strong>
+        </h2>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -71,7 +73,6 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
             </select>
             {role === "4" && (
               <>
-             
                 <label>Name</label>
                 <input
                   type="text"
@@ -92,14 +93,46 @@ const AddAccountModal = ({ isOpen, onClose, onAdd }) => {
                   }
                   required
                 />
+                <label>Contact No.</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={credentials.contact_no}
+                  onChange={(e) =>
+                    setCredentials({
+                      ...credentials,
+                      contact_no: e.target.value,
+                    })
+                  }
+                  required
+                />
+                <label>Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  value={credentials.email}
+                  onChange={(e) =>
+                    setCredentials({ ...credentials, email: e.target.value })
+                  }
+                  required
+                />
               </>
             )}
           </div>
-          <div className="modal-buttons">
-            <button type="submit">Add Account</button>
-            <button type="button" onClick={onClose}>
+          <div className="d-flex justify-content-end w-100 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername("");
+                setPassword("");
+                setRole("");
+                setCredentials({ customer_id: "", name: "", location: "" });
+                onClose();
+              }}
+            >
               Cancel
             </button>
+            <button type="submit">Add Account</button>
           </div>
         </form>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../css/AddItemModal.css";
+import "../css/style.css";
 import apiUrl from "../ApiUrl/apiUrl";
 import { toast } from "react-toastify";
 
@@ -18,6 +19,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
     const d = new Date(date);
     return d.toISOString().split("T")[0]; // Extract "YYYY-MM-DD"
   };
+
   useEffect(() => {
     if (isOpen && document) {
       setDocumentName(document.documentName || "");
@@ -47,6 +49,36 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
     }
   };
 
+  const handleArchive = async () => {
+    if (!document) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${document.isArchive == 1? 'Unarchive' : 'Archive'} the document "${document.documentName}"?`
+    );
+
+    if (!confirmed) return;
+    var archiveValue = 0;
+    if (document.isArchive == 1) {
+      archiveValue = 0;
+    } else {
+      archiveValue = 1;
+    }
+    try {
+      await axios.put(`${apiUrl}/documents/${document.id}/archive`, {
+        ...document,
+        archiveValue: archiveValue,
+        user: localStorage.getItem("username"),
+      });
+
+      toast.success("Document archived successfully!");
+      onEdit();
+      onClose();
+    } catch (error) {
+      console.error("Error archiving document:", error);
+      toast.error("Failed to archive document.");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -67,6 +99,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
         },
       });
 
+      toast.success("Document updated successfully!");
       onEdit(); // Refresh the document list
       onClose(); // Close the modal
     } catch (error) {
@@ -80,7 +113,18 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
   return (
     <div id="editModal" className="modal-overlay">
       <div className="modal-content">
-        <h2>Edit Document</h2>
+        <div className="headercon">
+          <h2>Edit Document</h2>
+          <button
+            hidden={document.status !== 0}
+            className="btn"
+            style={{backgroundColor: "orange" , color: "white"}}
+            type="button"
+            onClick={handleArchive}
+          >
+            {document.isArchive == 1 ? "Unarchive" : "Archive"}
+          </button>
+        </div>
         <form onSubmit={handleSubmit}>
           <label>Document Name</label>
           <input
@@ -135,9 +179,9 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
             onChange={(e) => setDescription(e.target.value)}
             required
           ></textarea>
-          <hr></hr>
+          <hr />
           <button type="submit">Save Changes</button>
-          <hr></hr>
+          <hr />
           <button type="button" onClick={onClose}>
             Cancel
           </button>

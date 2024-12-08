@@ -11,6 +11,7 @@ import {
   faClipboardList,
   faTimes,
   faCog,
+  faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 
 const Sidebar = () => {
@@ -40,17 +41,22 @@ const Sidebar = () => {
         </li>
         <li>
           <Link to="/sales-admin/ready">
-            <FontAwesomeIcon icon={faCog} /> Ready to go
+            <FontAwesomeIcon icon={faCheck} /> Ready to Pickup
           </Link>
         </li>
         <li>
           <Link to="/sales-admin/delivery">
-            <FontAwesomeIcon icon={faTruck} /> Delivery
+            <FontAwesomeIcon icon={faTruck} /> Transit
           </Link>
         </li>
         <li>
           <Link to="/sales-admin/sales">
             <FontAwesomeIcon icon={faChartLine} /> Sales
+          </Link>
+        </li>
+        <li>
+          <Link to="/sales-admin/declined">
+            <FontAwesomeIcon icon={faTimes} /> Declined
           </Link>
         </li>
         <li>

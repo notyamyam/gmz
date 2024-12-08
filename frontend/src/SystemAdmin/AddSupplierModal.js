@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "../css/AddItemModal.css";
 import axios from "axios";
 import apiUrl from "../ApiUrl/apiUrl";
+import { toast } from "react-toastify";
 
 const AddItemModal = ({ isOpen, onClose, onAdd }) => {
   const [supplyName, setSupplyName] = useState("");
@@ -28,7 +29,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
   const handleContactChange = (e) => {
     const value = e.target.value;
 
-    if (value.length <= 12) {
+    if (value.length <= 11) {
       setContact(value);
     }
   };
@@ -56,19 +57,29 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
       prev.filter((item) => item.productId !== productId)
     );
   };
-console.log(addedProducts);
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const contactRegex = /^09\d{9}$/;
 
+    if (!contactRegex.test(contact)) {
+      toast.error("Number format is not correct.");
+      return; // Prevent form submission if the contact is invalid
+    }
     const newSupplier = {
       supplyName,
       contact,
       address,
-      products: addedProducts, 
+      products: addedProducts,
     };
 
-    console.log(newSupplier);
-    onAdd(newSupplier); // Call the onAdd function with the supplier data
+    onAdd(newSupplier);
+    setSupplyName("");
+    setContact("");
+    setAddress("");
+    setSelectedProduct("");
+    setSelectedPrice("");
+    setAddedProducts([]);
     onClose(); // Close the modal
   };
 
@@ -77,7 +88,9 @@ console.log(addedProducts);
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Add New Supplier</h2>
+        <h2 style={{ color: "gray" }}>
+          <strong>Add New Supplier</strong>
+        </h2>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -119,7 +132,12 @@ console.log(addedProducts);
               type="number"
               placeholder="Price"
               value={selectedPrice}
-              onChange={(e) => setSelectedPrice(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (newValue >= 0 || newValue === "") {
+                  setSelectedPrice(newValue);
+                }
+              }}
               min="0"
               step="0.01"
             />
@@ -136,7 +154,7 @@ console.log(addedProducts);
               <p>No products added yet.</p>
             ) : (
               <ul>
-                <div >
+                <div>
                   {addedProducts.map((item, index) => {
                     const product = availableProducts.find(
                       (p) => p.matId.toString() === item.productId
@@ -159,10 +177,25 @@ console.log(addedProducts);
             )}
           </div>
 
-          <button type="submit">Add Supplier</button>
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
+          <div className="d-flex flex-column gap-2">
+            {" "}
+            <button type="submit">Add Supplier</button>
+            <button
+              type="button"
+              onClick={() => {
+                setSupplyName("");
+                setContact("");
+                setAddress("");
+                setSelectedProduct("");
+                setSelectedPrice("");
+                setAddedProducts([]);
+
+                onClose();
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       </div>
     </div>

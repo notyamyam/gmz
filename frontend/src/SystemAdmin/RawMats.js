@@ -16,12 +16,16 @@ function RawMats() {
   const [rawMats, setRawMats] = useState([]);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
-  const [isDetailsModalOpen, setDetailsModalOpen] = useState(false); // State for details modal
+  const [isDetailsModalOpen, setDetailsModalOpen] = useState(false);
   const [currentMats, setCurrentMats] = useState(null);
-  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false); // State for delete modal
-  const [itemToDelete, setItemToDelete] = useState(null); // Item to delete
-  const [searchQuery, setSearchQuery] = useState(""); // State for search input
-  const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" }); // State for sort configuration
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Adjust the items per page as needed
 
   const fetchData = async () => {
     try {
@@ -35,7 +39,7 @@ function RawMats() {
 
   const deleteItem = async (id) => {
     try {
-      const response = await axios.delete(`${apiUrl}/deletemats/${id}`);
+      await axios.delete(`${apiUrl}/deletemats/${id}`);
       fetchData();
       toast.success("Raw Material deleted successfully!");
     } catch (error) {
@@ -48,7 +52,7 @@ function RawMats() {
 
   const addRawMat = async (newMat) => {
     try {
-      const response = await axios.post(`${apiUrl}/addmats`, newMat);
+      await axios.post(`${apiUrl}/addmats`, newMat);
       fetchData();
       toast.success("Raw Material added successfully!");
     } catch (error) {
@@ -58,10 +62,7 @@ function RawMats() {
 
   const updateRawMat = async (updatedMat) => {
     try {
-      const response = await axios.put(
-        `${apiUrl}/updatemats/${updatedMat.matId}`,
-        updatedMat
-      );
+      await axios.put(`${apiUrl}/updatemats/${updatedMat.matId}`, updatedMat);
       fetchData();
       toast.success("Raw Material updated successfully!");
     } catch (error) {
@@ -71,15 +72,15 @@ function RawMats() {
 
   const handleDeleteConfirm = async () => {
     if (itemToDelete) {
-      await deleteItem(itemToDelete.matId); // Call deleteItem with the itemId
+      await deleteItem(itemToDelete.matId);
     }
-    setDeleteModalOpen(false); // Close the modal after deletion
-    setItemToDelete(null); // Clear the item to delete
+    setDeleteModalOpen(false);
+    setItemToDelete(null);
   };
 
   const confirmDeleteItem = (item) => {
-    setItemToDelete(item); // Set the item to be deleted
-    setDeleteModalOpen(true); // Open the delete modal
+    setItemToDelete(item);
+    setDeleteModalOpen(true);
   };
 
   const openEditModal = (mats) => {
@@ -103,7 +104,11 @@ function RawMats() {
   const filteredData = rawMats.filter((item) => {
     return (
       item.matName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.total_remaining_quantity
+        .toString()
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
     );
   });
 
@@ -118,6 +123,16 @@ function RawMats() {
     return 0;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+
+  const currentData = sortedData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -127,9 +142,12 @@ function RawMats() {
       <ToastContainer position="top-right" autoClose={3000} />
       <Sidebar />
       <Header />
-
       <div className="main-content">
-        <div className="page-title">RAW MATERIALS</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Raw Materials</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
@@ -148,36 +166,33 @@ function RawMats() {
                   placeholder="Search by Name or Category..."
                   size="40"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setSearchQuery(e.target.value);
+                  }}
                 />
               </div>
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort("matId")}>#</th>
                   <th onClick={() => handleSort("matName")}>Item Name</th>
                   <th>Quantity</th>
                   <th onClick={() => handleSort("category")}>Category</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
+
               <tbody>
-                {sortedData.map((rawMats, index) => (
+                {currentData.map((rawMats, index) => (
                   <tr key={index}>
-                    <td>{rawMats.matId}</td>
                     <td>{rawMats.matName}</td>
                     <td>{rawMats.total_remaining_quantity}</td>
                     <td>{rawMats.category}</td>
                     <td>
                       <div className="docubutton">
-                        {" "}
                         <button
                           className="done-btn"
                           onClick={() => openDetailsModal(rawMats)}
@@ -195,7 +210,7 @@ function RawMats() {
                           onClick={() => openEditModal(rawMats)}
                         >
                           <i className="fa-solid fa-pen-to-square"></i>
-                        </button>{" "}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -203,17 +218,34 @@ function RawMats() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Modals */}
       <AddRawMatsModal
         isOpen={isAddModalOpen}
         onClose={() => setAddModalOpen(false)}
         onAdd={addRawMat}
       />
-
-      {/* Edit Modal */}
       <EditRawMatsModal
         isOpen={isEditModalOpen}
         onClose={() => setEditModalOpen(false)}
@@ -225,11 +257,10 @@ function RawMats() {
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDeleteConfirm}
       />
-      {/* Raw Material Details Modal */}
       <RawMatDetailsModal
         isOpen={isDetailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
-        rawMat={currentMats} // Pass the current material for
+        rawMat={currentMats}
       />
     </div>
   );

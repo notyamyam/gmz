@@ -5,6 +5,7 @@ import Header from "../BG/DataAdminHeader";
 import Sidebar from "../BG/DataAdminSidebar";
 import AddProductionModal from "./AddProductionModal"; // Add production modal
 import UpdateProductionModal from "./UpdateProductionModal"; // Update production modal
+import ViewMaterialsModal from "./ViewMaterialsModal";
 import DeleteModal from "./DeleteModal"; // Import DeleteModal component
 import { ToastContainer, toast } from "react-toastify";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -17,23 +18,29 @@ function Production() {
   const [items, setItems] = useState([]); // For inventory items
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [isUpdateModalOpen, setUpdateModalOpen] = useState(false);
-  const [selectedProductionId, setSelectedProductionId] = useState(null); // Store selected production for update
+  const [selectedProductionId, setSelectedProductionId] = useState(null);
+  const [materialUse, setRawMaterialUse] = useState();
+  const [isViewMaterialsModalOpen, setIsViewMaterialsModalOpen] =
+    useState(false);
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isDoneOpen, setIsDoneOpen] = useState(false);
   const [doneItem, setDoneItem] = useState([]);
   const [itemToDelete, setItemToDelete] = useState(null); // Item to delete
   const [searchText, setSearchText] = useState("");
   const [sortConfig, setSortConfig] = useState({
-    key: "itemName", // Default column to sort by
+    key: "", // Default column to sort by
     direction: "asc", // Default sort direction
   });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Adjust the items per page as needed
 
   // Fetch production data, inventory items
   const fetchData = async () => {
     try {
       const response = await axios.get(`${apiUrl}/production`);
       setProductions(response.data);
-
+      console.log(response);
       const itemResponse = await axios.get(`${apiUrl}/item`);
       setItems(itemResponse.data);
     } catch (error) {
@@ -124,6 +131,7 @@ function Production() {
     const searchLower = searchText.toLowerCase();
     const itemName = getItemName(production.itemId).toLowerCase();
     const staffName = production.staffName.toLowerCase();
+
     return itemName.includes(searchLower) || staffName.includes(searchLower);
   });
 
@@ -135,6 +143,14 @@ function Production() {
     }
     setSortConfig({ key, direction });
   };
+
+  const totalPages = Math.ceil(filteredProductions.length / itemsPerPage);
+  const currentData = filteredProductions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleDone = async (item, producedQuantity) => {
     console.log(producedQuantity);
@@ -158,7 +174,11 @@ function Production() {
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Production Records</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Production Records</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
@@ -177,41 +197,42 @@ function Production() {
                   placeholder="Search by Item or Staff"
                   size="40"
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setSearchText(e.target.value);
+                  }}
                 />
               </div>
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort("itemId")}>#</th>
+                  <th onClick={() => handleSort("productionId")}>#</th>
                   <th onClick={() => handleSort("itemName")}>Item</th>
-                  <th onClick={() => handleSort("quantityProduced")}>
-                    Quantity Produced
-                  </th>
+                  <th>Quantity Produced</th>
                   <th onClick={() => handleSort("productionDate")}>Date</th>
-                  <th onClick={() => handleSort("staffName")}>Staff</th>
+                  <th>Staff</th>
                   <th onClick={() => handleSort("production_status")}>
                     Status
                   </th>
                   <th>Actions</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
               <tbody>
-                {filteredProductions?.map((production, index) => (
+                {currentData?.map((production, index) => (
                   <tr key={index}>
                     <td>{production.productionId}</td>
                     <td>{production.itemName}</td>
-                    <td>{production.quantityProduced}</td>
-                    <td>{formatDate(production.productionDate)}</td>
+                    <td className="text-center">
+                      {production.quantityProduced}
+                    </td>
+                    <td className="w-25 text-center">
+                      {formatDate(production.productionDate)}
+                    </td>
                     <td>{production.staffName}</td>
-                    <td>
+                    <td className="text-center align-middle">
                       {" "}
                       <span
                         className={`badge ${
@@ -227,7 +248,16 @@ function Production() {
                     </td>
                     <td>
                       <div className="docubutton">
-                        {" "}
+                        <button
+                          className="view-btn"
+                          onClick={() => {
+                            setRawMaterialUse(production.materials);
+                            setIsViewMaterialsModalOpen(true);
+                          }}
+                          style={{ backgroundColor: "red", color: "white" }}
+                        >
+                          <i className="fa-solid fa-eye"></i>
+                        </button>
                         <button
                           className="done-btn"
                           hidden={production.production_status === 1}
@@ -258,10 +288,33 @@ function Production() {
               </tbody>
             </table>
           </div>
+
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Update Production Modal */}
+      {/* View Materials Modal */}
+      <ViewMaterialsModal
+        isOpen={isViewMaterialsModalOpen}
+        onClose={() => setIsViewMaterialsModalOpen(false)}
+        materials={materialUse}
+      />
 
       <UpdateProductionModal
         isOpen={isUpdateModalOpen}

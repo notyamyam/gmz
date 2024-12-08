@@ -28,6 +28,11 @@ function Inventory() {
     key: "itemName",
     direction: "asc",
   });
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // You can adjust this number as needed
+
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -36,7 +41,6 @@ function Inventory() {
       const data = await response.json();
       setItem(data);
       setFilteredItems(data);
-      console.log(data);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -115,19 +119,21 @@ function Inventory() {
 
   const openDetailsModal = (item) => {
     setCurrentItem(item);
-    console.log(item);
     fetchInventoryDetails(item.itemId);
     setDetailsModalOpen(true);
   };
 
   const handleSearch = (event) => {
+    setCurrentPage(1);
     setSearchQuery(event.target.value);
     const query = event.target.value.toLowerCase();
     const filtered = item.filter(
       (item) =>
         item.itemName.toLowerCase().includes(query) ||
         item.category.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query)
+        item.description.toLowerCase().includes(query) ||
+        item.price.toString().toLowerCase().includes(query) || // Include price field
+        item.totalQuantity.toString().toLowerCase().includes(query) // Include totalQuantity field
     );
     setFilteredItems(filtered);
   };
@@ -146,13 +152,28 @@ function Inventory() {
     setSortConfig({ key, direction });
   };
 
+  // Paginate the items based on currentPage
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Handle page change
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
   return (
     <div className="container1">
       <ToastContainer position="top-right" autoClose={3000} />
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Products</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Inventory</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
@@ -168,7 +189,7 @@ function Inventory() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="Search by Item Name, Category or Description"
+                  placeholder="Search"
                   size="40"
                   value={searchQuery}
                   onChange={handleSearch}
@@ -177,34 +198,32 @@ function Inventory() {
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort("itemId")}>#</th>
-                  <th onClick={() => handleSort("itemName")}>Item Name</th>
+                  <th onClick={() => handleSort("itemName")}>Product Name</th>
                   <th onClick={() => handleSort("price")}>Price</th>
                   <th onClick={() => handleSort("category")}>Category</th>
-                  <th onClick={() => handleSort("quantity")}>Quantity</th>
+                  <th onClick={() => handleSort("totalQuantity")}>Quantity</th>
                   <th onClick={() => handleSort("description")}>Description</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
               <tbody>
-                {filteredItems.map((item, index) => (
+                {currentItems.map((item, index) => (
                   <tr key={index}>
-                    <td>{item.itemId}</td>
                     <td>{item.itemName}</td>
-                    <td>₱{item.price}</td>
+                    <td>
+                      {new Intl.NumberFormat("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      }).format(item.price)}
+                    </td>
                     <td>{item.category}</td>
-                    <td>{item.totalQuantity}</td>
+                    <td className="text-center">{item.totalQuantity}</td>
                     <td>{item.description}</td>
                     <td>
                       <div className="docubutton">
-                        {" "}
                         <button
                           className="done-btn"
                           onClick={() => openDetailsModal(item)}
@@ -229,6 +248,24 @@ function Inventory() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>

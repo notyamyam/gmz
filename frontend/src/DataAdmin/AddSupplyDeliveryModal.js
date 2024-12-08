@@ -151,7 +151,10 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Order Products from Supplier</h2>
+        <h2 style={{ color: "gray" }}>
+          {" "}
+          <strong>Order Products from Supplier</strong>
+        </h2>
         <form onSubmit={handleSubmit}>
           {/* Supplier selection */}
           <label hidden={selectedSupplier}>Select Supplier:</label>
@@ -171,72 +174,90 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
 
           {/* Product selection and quantity input */}
           {selectedSupplier && (
-            <div className="product-selection">
-              <label>Select Product:</label>
-              <select
-                id="product-select"
-                value={selectedProduct.matId || ""}
-                onChange={(e) => handleSelectProduct(e.target.value)}
-              >
-                <option value="">Select a Product</option>
-                {availableProducts.map((product) => (
-                  <option key={product.matId} value={product.matId}>
-                    {product.matName}
-                  </option>
-                ))}
-              </select>
+            <div className="product-selection ">
+              <div className="d-flex flex-column gap-2">
+                <div>
+                  <label>Select Product:</label>
+                  <select
+                    id="product-select"
+                    value={selectedProduct.matId || ""}
+                    onChange={(e) => handleSelectProduct(e.target.value)}
+                  >
+                    <option value="">Select a Product</option>
+                    {availableProducts.map((product) => (
+                      <option key={product.matId} value={product.matId}>
+                        {product.matName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <label>Enter Quantity:</label>
-              <input
-                type="number"
-                id="quantity-input"
-                placeholder="Quantity"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-              <span> </span>
-              <label>Price:</label>
-              <input
-                type="number"
-                id="price-input"
-                placeholder="Price"
-                value={productPrice}
-                required
-                disabled
-              />
+                <div className="d-flex flex-column">
+                  <label>Enter Quantity:</label>
+                  <input
+                    type="number"
+                    id="quantity-input"
+                    placeholder="Quantity"
+                    value={quantity}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      if (newValue >= 0 || newValue === "") {
+                        setQuantity(newValue);
+                      }
+                    }}
+                  />
+                  <span> </span>
+                  <label>Price:</label>
+                  <input
+                    type="number"
+                    id="price-input"
+                    placeholder="Price"
+                    value={productPrice}
+                    required
+                    disabled
+                  />
 
-              <button
-                type="button"
-                onClick={() => {
-                  const productId =
-                    document.getElementById("product-select").value;
-                  const quantity =
-                    document.getElementById("quantity-input").value;
-                  const price = document.getElementById("price-input").value;
+                  <button
+                    type="button"
+                    style={{ backgroundColor: "red", color: "white" }}
+                    onClick={() => {
+                      const productId =
+                        document.getElementById("product-select").value;
+                      const quantity =
+                        document.getElementById("quantity-input").value;
+                      const price =
+                        document.getElementById("price-input").value;
 
-                  handleAddProduct(
-                    selectedProduct.matId,
-                    parseInt(quantity),
-                    parseFloat(price)
-                  );
-                }}
-              >
-                Add Product
-              </button>
+                      handleAddProduct(
+                        selectedProduct.matId,
+                        parseInt(quantity),
+                        parseFloat(price)
+                      );
+                    }}
+                  >
+                    Add to List
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Display added products */}
-          <div className="added-products">
-            <h4>Added Products:</h4>
+          <div className="added-products mt-2">
+            <h4 style={{ color: "gray" }}>
+              <strong>List of Products:</strong>
+            </h4>
             {addedProducts.length === 0 ? (
               <p>No products added yet.</p>
             ) : (
               <ul>
                 {addedProducts.map((item, index) => (
                   <li key={index}>
-                    {item.matName} - ₱{item.price} x {item.quantity} = ₱
-                    {item.total.toFixed(2)}
+                    {item.matName} - ₱{item.price} x {item.quantity} =
+                    {new Intl.NumberFormat("en-PH", {
+                      style: "currency",
+                      currency: "PHP",
+                    }).format(item.total)}
                     <button
                       type="button"
                       onClick={() => handleRemoveProduct(item.productId)}
@@ -252,16 +273,32 @@ const AddSupplyDeliveryModal = ({ isOpen, onClose, onAdd, suppliers }) => {
 
           {/* Display total cost */}
           <div className="total-cost">
-            <h4>Total Cost: ₱{totalCost.toFixed(2)}</h4>
+            <h4>
+              {" "}
+              <strong> Total Cost: </strong>
+            </h4>
+
+            <h5>
+              <i>
+                {new Intl.NumberFormat("en-PH", {
+                  style: "currency",
+                  currency: "PHP",
+                }).format(totalCost)}
+              </i>
+            </h5>
           </div>
 
           {/* Submit button */}
-          <div className="modal-footer">
+          <div className="modal-footer gap-2">
+            <button
+              type="button"
+              style={{ color: "black", backgroundColor: "white" }}
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
             <button type="submit" onClick={handleSubmit}>
               Place Order
-            </button>
-            <button type="button" onClick={onCancel}>
-              Cancel
             </button>
           </div>
         </form>

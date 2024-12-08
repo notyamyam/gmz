@@ -18,7 +18,8 @@ function ProductionMaterialsLogs() {
   const [logToUpdate, setLogToUpdate] = useState(null);
   const [sortOrder, setSortOrder] = useState("asc"); // 'asc' or 'desc' for sorting order
 
-  // Fetch logs from backend
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Adjust the items per page as needed
   const fetchLogs = async () => {
     try {
       const response = await axios.get(`${apiUrl}/production-material-logs`);
@@ -32,10 +33,13 @@ function ProductionMaterialsLogs() {
     fetchLogs();
   }, []);
 
-  const handleSearchChange = (e) => setSearch(e.target.value);
+  const handleSearchChange = (e) => {
+    setCurrentPage(1);
+    setSearch(e.target.value);
+  };
 
   // Sorting function
-  const sortLogsByDate = () => {
+  const sortLogs = () => {
     const sortedLogs = [...logs].sort((a, b) => {
       const dateA = new Date(a.dateLogged);
       const dateB = new Date(b.dateLogged);
@@ -52,6 +56,13 @@ function ProductionMaterialsLogs() {
       log.description.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const currentData = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
   const handleAddLogClick = () => setAddModalOpen(true);
 
   const handleEditLogClick = (log) => {
@@ -106,7 +117,11 @@ function ProductionMaterialsLogs() {
       <Sidebar />
       <Header />
       <div className="main-content">
-        <div className="page-title">Material Used Logs</div>
+        <div className="d-flex w-100 justify-content-start ">
+          <h4>
+            <strong style={{ color: "gray" }}>Material Used Logs</strong>
+          </h4>
+        </div>
         <div className="info">
           <div className="above-table">
             <div className="above-table-wrapper">
@@ -122,7 +137,7 @@ function ProductionMaterialsLogs() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="Search by description..."
+                  placeholder="Search"
                   size="40"
                   onChange={handleSearchChange}
                 />
@@ -130,29 +145,24 @@ function ProductionMaterialsLogs() {
             </div>
           </div>
           <div className="t-head">
-            <table className="table-head">
+            <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th>#</th>
-
-                  <th onClick={sortLogsByDate}>Date</th>
-                  <th>Logs</th>
+                  <th onClick={sortLogs}>#</th>
+                  <th onClick={sortLogs}>Date</th>
+                  <th onClick={sortLogs}>Logs</th>
                   {/* <th>Actions</th> */}
                 </tr>
               </thead>
-            </table>
-          </div>
-          <div className="table-list">
-            <table>
               <tbody>
-                {filteredLogs.length === 0 ? (
+                {currentData.length === 0 ? (
                   <tr>
                     <td colSpan="5" style={{ textAlign: "center" }}>
                       No logs found.
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map((log, index) => {
+                  currentData.map((log, index) => {
                     const materialNames = log.matNames
                       ? log.matNames.split(", ")
                       : [];
@@ -170,7 +180,7 @@ function ProductionMaterialsLogs() {
 
                     return (
                       <tr key={index}>
-                        <td>{log.logId}</td>
+                        <td>{log.productionId}</td>
                         <td>{new Date(log.dateLogged).toLocaleDateString()}</td>
                         <td>{log.description}</td>
 
@@ -197,6 +207,24 @@ function ProductionMaterialsLogs() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>

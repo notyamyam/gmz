@@ -102,7 +102,12 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate }) => {
             type="number"
             placeholder="Price"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue >= 0 || newValue === "") {
+                setPrice(newValue);
+              }
+            }}
             required
           />
           <select

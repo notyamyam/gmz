@@ -17,38 +17,28 @@ function Dashboard() {
   const dashboardRef = useRef(null);
 
   const ITEMS_PER_PAGE = 5;
+  const fetch = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/dashboard`);
+      const { inventory, rawMaterials, supplierDeliveries, production } =
+        response.data;
+
+      setInventory(inventory);
+      setRawMaterials(rawMaterials);
+      setSupplierDeliveries(supplierDeliveries);
+      setProduction(production);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    }
+  };
 
   useEffect(() => {
-    // Fetch inventory
-    axios
-      .get(`${apiUrl}/itemdashboard`)
-      .then((response) => setInventory(response.data))
-      .catch((error) => console.error("Error fetching inventory:", error));
-
-    // Fetch raw materials
-    axios
-      .get(`${apiUrl}/rawmatsdashboard`)
-      .then((response) => setRawMaterials(response.data))
-      .catch((error) => console.error("Error fetching raw materials:", error));
-
-    // Fetch supplier deliveries
-    axios
-      .get(`${apiUrl}/supDeliDashboard`)
-      .then((response) => setSupplierDeliveries(response.data))
-      .catch((error) =>
-        console.error("Error fetching supplier deliveries:", error)
-      );
-
-    // Fetch production
-    axios
-      .get(`${apiUrl}/productionDashboard`)
-      .then((response) => setProduction(response.data))
-      .catch((error) => console.error("Error fetching production:", error));
+    fetch();
   }, []);
 
   const details = {
-    "Low Stocks": inventory,
-    "Raw Materials": rawMaterials,
+    "Critical Stock": inventory,
+    "Critical Raw Materials": rawMaterials,
     "Pending Deliveries": supplierDeliveries,
     "Pending Production": production,
   };
@@ -63,22 +53,30 @@ function Dashboard() {
   const handleRightClick = (event, cardName) => {
     event.preventDefault();
     setPinnedCard(cardName);
-    setTooltipPosition({ top: event.clientY + window.scrollY, left: event.clientX });
+    setTooltipPosition({
+      top: event.clientY + window.scrollY,
+      left: event.clientX,
+    });
     setCurrentPage(1);
   };
 
   const handleMouseEnter = (event, cardName) => {
     if (!pinnedCard) {
       setHoveredCard(cardName);
-      setTooltipPosition({ top: event.clientY + window.scrollY, left: event.clientX });
+      setTooltipPosition({
+        top: event.clientY + window.scrollY,
+        left: event.clientX,
+      });
       setCurrentPage(1);
     }
   };
 
-  const handleMouseLeave = () => {
-    if (!pinnedCard) setHoveredCard(null);
+  const handleMouseLeave = (e) => {
+    if (!pinnedCard) {
+      setPinnedCard(null);
+      setHoveredCard(null);
+    }
   };
-
   const handleClickOutside = (event) => {
     if (dashboardRef.current && !dashboardRef.current.contains(event.target)) {
       setPinnedCard(null);
@@ -111,7 +109,11 @@ function Dashboard() {
       <Header />
       <div className="main-content" ref={dashboardRef}>
         <div className="p-4">
-          <h1 className="page-title">DASHBOARD</h1>
+          <div className="d-flex w-100 justify-content-start ">
+            <h4>
+              <strong style={{ color: "gray" }}>Dashboard</strong>
+            </h4>
+          </div>
           <div className="row mt-4">
             {/* Cards */}
             {Object.keys(details).map((key, index) => (
@@ -130,12 +132,13 @@ function Dashboard() {
                     borderRadius: "15px",
                     background: gradientColors[index % gradientColors.length],
                     boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              
                   }}
                 >
                   <div className="card-body d-flex flex-column justify-content-center align-items-center">
                     <h5 className="card-title text-uppercase">{key}</h5>
-                    <p className="card-text fs-3 fw-bold">{details[key].length}</p>
+                    <p className="card-text fs-3 fw-bold">
+                      {details[key].length}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -164,21 +167,25 @@ function Dashboard() {
               <table className="table table-sm">
                 <thead>
                   <tr>
-                    {Object.keys(details[pinnedCard || hoveredCard]?.[0] || {}).map((key) => (
-                      <th key={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</th>
+                    {Object.keys(
+                      details[pinnedCard || hoveredCard]?.[0] || {}
+                    ).map((key) => (
+                      <th key={key}>
+                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {getPaginatedData(details[pinnedCard || hoveredCard] || []).map((item, index) => (
+                  {getPaginatedData(
+                    details[pinnedCard || hoveredCard] || []
+                  ).map((item, index) => (
                     <tr key={index}>
                       {Object.values(item).map((value, idx) => (
                         <td key={idx}>
-                          {typeof value === "object" ? (
-                            JSON.stringify(value, null, 2) // Render object as string
-                          ) : (
-                            value
-                          )}
+                          {typeof value === "object"
+                            ? JSON.stringify(value, null, 2) // Render object as string
+                            : value}
                         </td>
                       ))}
                     </tr>
@@ -188,7 +195,10 @@ function Dashboard() {
               <div className="pagination-controls">
                 <button
                   onClick={() =>
-                    handlePageChange("prev", details[pinnedCard || hoveredCard].length)
+                    handlePageChange(
+                      "prev",
+                      details[pinnedCard || hoveredCard].length
+                    )
                   }
                   disabled={currentPage === 1}
                 >
@@ -196,7 +206,10 @@ function Dashboard() {
                 </button>
                 <button
                   onClick={() =>
-                    handlePageChange("next", details[pinnedCard || hoveredCard].length)
+                    handlePageChange(
+                      "next",
+                      details[pinnedCard || hoveredCard].length
+                    )
                   }
                   disabled={
                     currentPage * ITEMS_PER_PAGE >=

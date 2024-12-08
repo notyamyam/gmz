@@ -1,0 +1,24 @@
+.modalContent {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px; /* Softer, rounded corners */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    width: 80%;
+    height: 80%;
+    max-width: 80%; /*Slightly smaller for a neater look */
+    position: relative;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.modalConfirm {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px; /* Softer, rounded corners */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    width: 80%;
+    max-width: 80%; /*Slightly smaller for a neater look */
+    position: relative;
+    animation: fadeIn 0.5s ease-in-out;
+  }

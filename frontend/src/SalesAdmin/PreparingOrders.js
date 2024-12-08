@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import "../css/style.css";
 import Header from "../BG/SalesAdminHeader";
 import Sidebar from "../BG/SalesAdminSidebar";
@@ -7,20 +7,20 @@ import moment from "moment";
 import EditOrderModal from "./EditOrderModal";
 import apiUrl from "../ApiUrl/apiUrl";
 
+import style from "./PreparingOrders.module.css";
+
 // toast
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 function PreparingOrders() {
   const [orders, setOrders] = useState([]);
-  const [items, setItems] = useState([]); // New state to hold items
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   //modal viewing of products per order
   const [viewPreparingModal, setViewPreparingModal] = useState(false);
 
-  const [preparingOrders, setPreparingOrders] = useState([]);
   const [viewPreparingOrders, setViewPreparingOrders] = useState([]);
 
   const [userId, setUserId] = useState("");
@@ -28,6 +28,61 @@ function PreparingOrders() {
 
   const [refNo, setRefNo] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
+
+  // Paginate the items based on currentPage
+  const [item, setItem] = useState([]);
+  const [preparingOrders, setPreparingOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const itemsPerPage = 8;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+  // If search is not empty, show filtered orders, else show preparing orders
+  const currentItems = searchQuery
+    ? filteredOrders.slice(indexOfFirstItem, indexOfLastItem)
+    : preparingOrders.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(
+    (searchQuery ? filteredOrders.length : preparingOrders.length) /
+      itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSearch = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(event.target.value);
+
+    if (query === "") {
+      setFilteredOrders([]); // Reset to show all data
+    } else {
+      const filtered = item.filter((order) => {
+        const orderId = order.order_id?.toLowerCase() || "";
+        const mop = order.mop?.toLowerCase() || "";
+        const customerName = order.customer_name?.toLowerCase() || "";
+        const customerLoc = order.customer_loc?.toLowerCase() || "";
+        const date = order.date?.toLowerCase() || "";
+        const totalSumPrice = order.total_sum_price
+          ? order.total_sum_price.toString().toLowerCase()
+          : "";
+
+        return (
+          orderId.includes(query) ||
+          mop.includes(query) ||
+          customerName.includes(query) ||
+          customerLoc.includes(query) ||
+          date.includes(query) ||
+          totalSumPrice.includes(query)
+        );
+      });
+      setFilteredOrders(filtered);
+    }
+
+    setCurrentPage(1);
+  };
 
   const openViewPreparingOrders = (data) => {
     setViewPreparingModal(true);
@@ -42,15 +97,22 @@ function PreparingOrders() {
   const fetchPreparing = async () => {
     try {
       const res = await axios.get(`${apiUrl}/preparing_Orders`);
-      console.log(res);
 
       if (res.data.status === "success") {
-        console.log("PREPARING ORDERS: ", res.data.res);
-        setPreparingOrders(res.data.res);
+        // Check if res.data.res is an array and set it to state
+        if (Array.isArray(res.data.res)) {
+          setPreparingOrders(res.data.res);
+          setItem(res.data.res);
+        } else {
+          console.log("Expected an array but got:", res.data.res);
+          setPreparingOrders([]);
+          setItem([]);
+        }
       } else {
-        throw new Error("No orders found.");
+        console.log("PREPARING ORDERS: ", res.data.res);
       }
     } catch (error) {
+      // setPreparingOrders([]);
       console.error("Error fetching orders:", error);
     }
   };
@@ -76,16 +138,19 @@ function PreparingOrders() {
   // Fetch items from the backend
 
   useEffect(() => {
-    fetchPreparing();
-  }, []);
+    if (!searchQuery) {
+      fetchPreparing();
+    }
+  }, [preparingOrders, searchQuery]);
+  //preparingOrders
 
   const handlePrepared = async (orderId) => {
     try {
       const res = await axios.post(`${apiUrl}/status_prepared/`, {
         orderId,
       });
-
-      if (res.data.status === "success") {
+      console.log("asds=>", res);
+      if (res.data.status == "success") {
         toast.success("Proceed to prepared, to assign rider.");
         setViewPreparingModal(false);
         fetchPreparing();
@@ -93,7 +158,7 @@ function PreparingOrders() {
         throw new Error("No order products found.");
       }
     } catch (error) {
-      console.log(error);
+      console.log("===================>", error);
     }
   };
 
@@ -104,16 +169,11 @@ function PreparingOrders() {
       <div className="main-content">
         <div className="d-flex w-100 justify-content-start">
           <h4>
-            <strong>Preparing Orders</strong>
+            <strong style={{ color: "gray" }}>Preparing Orders</strong>
           </h4>
         </div>
         <div className="info">
           <div className="above-table">
-            <div className="above-table-wrapper">
-              <button className="btn" id="sortButton">
-                <i className="fa-solid fa-sort"></i> Sort
-              </button>
-            </div>
             <div className="search-container1">
               <div className="search-wrapper">
                 <label>
@@ -122,14 +182,11 @@ function PreparingOrders() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="Search..."
+                  placeholder="Search"
                   size="40"
+                  value={searchQuery}
+                  onChange={handleSearch}
                 />
-              </div>
-              <div>
-                <button id="searchButton" className="btn">
-                  Search
-                </button>
               </div>
             </div>
           </div>
@@ -169,10 +226,12 @@ function PreparingOrders() {
               <tbody>
                 {preparingOrders?.length === 0 ? (
                   <tr>
-                    <td colSpan="6">NO PENDING ORDERS PLACED.</td>
+                    <td colSpan="6">
+                      NO <strong>PREPARING</strong> ORDERS PLACED.
+                    </td>
                   </tr>
                 ) : (
-                  preparingOrders?.map((preparingOrders, index) => (
+                  currentItems?.map((preparingOrders, index) => (
                     <tr key={index}>
                       <td className="text-start align-middle ">
                         <span className="me-2">{preparingOrders.order_id}</span>
@@ -230,12 +289,31 @@ function PreparingOrders() {
               </tbody>
             </table>
           </div>
+          <div className="pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
       {/* VIEW PENDING PRODUCTS OF ORDERS */}
       {viewPreparingModal && (
         <div className="modal-overlay">
-          <div className={`modal-content d-flex justify-content-between w-100`}>
+          <div
+            className={`${style["modalContent"]} d-flex flex-column justify-content-between w-100`}
+          >
             <div class="modal-header d-flex w-100 justify-content-between">
               <h5>
                 <strong>Ordered Products</strong>
@@ -261,7 +339,7 @@ function PreparingOrders() {
             </div>
             <div className="overflow-hidden">
               <div className={`table-list w-100`}>
-                <table className="table">
+                <table className="table table-bordered">
                   <thead>
                     <tr>
                       <th>Item name</th>

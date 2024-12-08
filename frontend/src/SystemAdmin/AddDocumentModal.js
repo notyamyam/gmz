@@ -70,7 +70,14 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
       })
       .then((res) => {
         toast.success("Document uploaded successfully!");
-        console.log(res);
+
+        onAdd();
+        setDocumentName("");
+        setDocumentFile(null);
+        setSelectedCategory("");
+        setDateEffective("");
+        setExpirationDate("");
+        setDescription("");
         onClose();
       })
       .catch((error) => {
@@ -145,7 +152,19 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
           <hr></hr>
           <button type="submit">Add Document</button>
           <hr></hr>
-          <button type="button" onClick={onClose}>
+          <button
+            type="button"
+            onClick={() => {
+              setDocumentName("");
+              setDocumentFile(null);
+              setSelectedCategory("");
+              setDateEffective("");
+              setExpirationDate("");
+              setDescription("");
+
+              onClose();
+            }}
+          >
             Cancel
           </button>
         </form>

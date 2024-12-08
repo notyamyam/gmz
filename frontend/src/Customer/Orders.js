@@ -16,7 +16,10 @@ function Orders() {
 
   const [showStockLabel, setStockLabel] = useState(false);
 
-  const openAddToCartModal = () => setAddToCart(true);
+  const openAddToCartModal = () => {
+    console.log("items: ", items);
+    setAddToCart(true);
+  };
   const closeAddToCartModal = () => {
     resetFields();
   };
@@ -27,14 +30,12 @@ function Orders() {
   const openCancelModal = (order_id) => {
     setCancelModal(true);
     setOrderId(order_id);
-    console.log("==>", order_id);
   };
   const closeCancelModal = () => setCancelModal(false);
 
   const openViewOrder = (order_id) => {
     setViewOrderModal(true);
     setOrderId(order_id);
-    fetchOrderedProducts(order_id);
   };
   const closeViewOrder = () => setViewOrderModal(false);
 
@@ -72,6 +73,54 @@ function Orders() {
   //calculate total price
   const totalSum = cartItems.reduce((sum, item) => sum + item.total_price, 0);
 
+  // Paginate the items based on currentPage
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [item, setItem] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+  const currentItems = searchQuery
+    ? filteredOrders.slice(indexOfFirstItem, indexOfLastItem)
+    : orderProd.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(
+    (searchQuery ? filteredOrders.length : orderProd.length) / itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSearch = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(event.target.value);
+    if (query === "") {
+      setFilteredOrders([]); // Reset to show all data
+    } else {
+      const filtered = item.filter((item) => {
+        const orderId = item.order_id ? item.order_id.toLowerCase() : "";
+        const mop = item.mop ? item.mop.toLowerCase() : "";
+
+        const status = item.status ? item.status.toLowerCase() : "";
+        const date = item.date ? item.date.toLowerCase() : "";
+        const totalSumPrice = item.total_sum_price
+          ? item.total_sum_price.toString().toLowerCase()
+          : "";
+
+        return (
+          orderId.includes(query) ||
+          mop.includes(query) ||
+          status.includes(query) ||
+          date.includes(query) ||
+          totalSumPrice.includes(query)
+        );
+      });
+      setFilteredOrders(filtered);
+    }
+    setCurrentPage(1);
+  };
+
   const fetchCustomerName = async () => {
     if (!userId) {
       console.log("User ID not found in localStorage.");
@@ -96,9 +145,10 @@ function Orders() {
 
   const fetchItems = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api-items`);
-      if (response.data.status === "success") {
-        setItems(response.data.res);
+      const res = await axios.get(`${apiUrl}/api-items`);
+      console.log(res);
+      if (res.data.status === "success") {
+        setItems(res.data.res);
       } else {
         throw new Error("No items found");
       }
@@ -111,7 +161,6 @@ function Orders() {
     try {
       const res = await axios.get(`${apiUrl}/mycart/${userId}`);
       if (res.data.status === "success") {
-        console.log(res.data.res);
         setCartItems(res.data.res);
       } else {
         throw new Error("No products found.");
@@ -124,32 +173,14 @@ function Orders() {
   const fetchOrders = async () => {
     try {
       const res = await axios.get(`${apiUrl}/orders_customer/${userId}`);
-      if (res.data.status === "success") {
-        console.log("ORDER: ", res.data.res);
+
+      if (Array.isArray(res.data.res)) {
         setOrderProd(res.data.res);
       } else {
-        throw new Error("No orders found.");
+        setOrderProd([]);
       }
     } catch (err) {
       console.log(err.message);
-    }
-  };
-
-  const fetchOrderedProducts = async (orderId) => {
-    try {
-      const res = await axios.post(`${apiUrl}/orders_products/`, {
-        userId,
-        orderId,
-      });
-
-      if (res.data.status === "success") {
-        setViewOrder(res.data.res);
-        console.log(res.data.res);
-      } else {
-        throw new Error("No order products found.");
-      }
-    } catch (error) {
-      console.log(error);
     }
   };
 
@@ -157,7 +188,6 @@ function Orders() {
     try {
       const res = await axios.get(`${apiUrl}/fetchmop/`);
       if (res.data.status === "success") {
-        console.log(res.data.res);
         setMopArray(res.data.res); // Populate the MOP array with data
       } else {
         throw new Error("No modes of payment found.");
@@ -168,20 +198,21 @@ function Orders() {
   };
 
   useEffect(() => {
-    fetchCustomerName();
-    fetchOrders();
-    fetchItems();
-    fetchMyCart();
-    fetchOrderedProducts();
+    if (!searchQuery) {
+      fetchCustomerName();
+      fetchOrders();
+      fetchItems();
+      fetchMyCart();
+    }
+    // fetchOrderedProducts();
     fetchMOP();
-  }, []);
+  }, [orderProd, searchQuery]);
 
   const removeProdCart = async (item_id) => {
     try {
       const res = await axios.delete(`${apiUrl}/remove-prod-cart`, {
         data: { item_id, user_id: userId },
       });
-      console.log(res.data);
       fetchMyCart();
     } catch (error) {
       console.log(error);
@@ -279,8 +310,6 @@ function Orders() {
         alert("Failed to place order.");
       }
     } catch (error) {
-      console.log("INSERTING DATA : ", insertCartData);
-
       console.error("Error placing order:", error);
       alert("Error placing order.", error);
     }
@@ -303,20 +332,38 @@ function Orders() {
 
       if (res.status === 200) {
         toast.success("Order placed successfully.");
-        setCartItems([]);
-        setShowMOP(false);
-        setMyCart(false);
-        fetchOrders();
+        setCartItems([]); // Clear cart
+        setShowMOP(false); // Hide MOP modal
+        setMyCart(false); // Hide the cart
+        fetchOrders(); // Fetch updated orders
+        setRefNo("");
       }
     } catch (error) {
-      console.log(error);
-      alert("Checkout failed. Please try again.");
+      if (error.response && error.response.status === 400) {
+        alert(error.response.data.message); // Show message if refNo is already used
+      } else {
+        alert("Checkout failed. Please try again.");
+      }
     }
   };
 
   const handleCancelOrder = async (orderId) => {
     try {
-      const res = await axios.post(`${apiUrl}/cancelled_order`, { orderId });
+      const remarks = prompt(
+        "Please enter your remarks for cancelling the order:"
+      );
+
+      // Validate if the input is empty or null
+
+      if (!remarks || remarks.trim() === "") {
+        alert("Remarks cannot be empty. Please try again.");
+        return; // Exit the function if validation fails
+      }
+      const res = await axios.post(`${apiUrl}/cancelling_order`, {
+        orderId,
+        remarks,
+      });
+
       if (res.status === 200) {
         toast.success("Order cancelled successfully.");
         fetchOrders();
@@ -324,11 +371,13 @@ function Orders() {
       }
     } catch (error) {
       console.log(error);
+      alert("Failed to cancel the order. Please try again.");
     }
   };
 
   // HANDLE PAYMENT IN MOP
   const handlePaymentChange = (e) => {
+    setRefNo("");
     const selectedValue = e.target.value;
 
     setPayment(selectedValue);
@@ -359,6 +408,22 @@ function Orders() {
               <strong>Orders</strong>
             </h5>
           </div>
+        </div>
+
+        <div className="w-100 d-flex justify-content-between">
+          <div className="search-wrapper">
+            <label>
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+            </label>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search"
+              size="20"
+              value={searchQuery}
+              onChange={handleSearch}
+            />
+          </div>
           <div className="d-flex w-100 justify-content-end align-items-center gap-2">
             <button
               className={`${style.btnTopButton} btn d-flex align-items-center justify-content-center`}
@@ -387,12 +452,12 @@ function Orders() {
               </tr>
             </thead>
             <tbody>
-              {orderProd.length === 0 ? (
+              {orderProd?.length === 0 ? (
                 <tr>
                   <td colSpan="6">NO ORDERS PLACED.</td>
                 </tr>
               ) : (
-                orderProd.map((product, index) => (
+                currentItems?.map((product, index) => (
                   <tr key={index}>
                     <td className="w-25 text-start align-middle ">
                       <span className="me-2">{product.order_id}</span>
@@ -410,29 +475,41 @@ function Orders() {
                     <td className="align-middle">
                       <span
                         className={`${
-                          style[`badge-${product.status.toLowerCase()}`]
+                          style[
+                            `badge-${(product.status === "Ready"
+                              ? "Departing"
+                              : product.status
+                            ).toLowerCase()}`
+                          ]
                         }`}
                       >
-                        <strong>{product.status}</strong>
+                        <strong>
+                          {product.status === "Ready"
+                            ? "Departing"
+                            : product.status}
+                        </strong>
                       </span>
                     </td>
 
                     <td className="align-middle">
                       <div className="d-flex align-items-center justify-content-center gap-2">
-                        <button
-                          className={`${style.buttonRemove} btn btn-danger d-flex align-items-center justify-content-center`}
-                          onClick={() => openCancelModal(product.order_id)}
-                        >
-                          <i
-                            className="fa fa-ban"
-                            style={{ fontSize: "15px" }}
-                          ></i>
-                        </button>
+                        {product.status === "Pending" && (
+                          <button
+                            className={`${style.buttonRemove} btn btn-danger d-flex align-items-center justify-content-center`}
+                            onClick={() => openCancelModal(product.order_id)}
+                          >
+                            <i
+                              className="fa fa-ban"
+                              style={{ fontSize: "15px" }}
+                            ></i>
+                          </button>
+                        )}
 
                         <button
                           className={`${style.buttonView} btn btn-primary d-flex align-items-center justify-content-center`}
                           onClick={() => {
                             openViewOrder(product.order_id);
+                            setViewOrder(product.products);
                           }}
                         >
                           <i
@@ -447,6 +524,23 @@ function Orders() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="pagination">
+          <button
+            onClick={() => paginate(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Prev
+          </button>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => paginate(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
         </div>
       </div>
       {/* Modal for add to cart product*/}
@@ -662,7 +756,13 @@ function Orders() {
               <button
                 className={`${style.btnDefault}`}
                 onClick={() => {
-                  setShowMOP(true);
+                  if (cartItems.length === 0) {
+                    alert(
+                      "No products in the cart! Please add products to proceed."
+                    );
+                  } else {
+                    setShowMOP(true); // Proceed to show the MOP if cart is not empty
+                  }
                 }}
               >
                 Check out
@@ -821,6 +921,7 @@ function Orders() {
                   setShowMOP(false);
                   setPayment("");
                   setShowFileInput(false);
+                  setRefNo("");
                 }}
               >
                 Cancel

@@ -29,14 +29,15 @@ function SupplierDetailsModal({ isOpen, onClose, supplier }) {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>Supplier Deliveries for {supplier.supplyName}</h2>
+        <h2 style={{ color: "gray" }}>
+          <strong>Supplier Deliveries for {supplier.supplyName}</strong>
+        </h2>
         <table>
           <thead>
             <tr>
               <th>#</th>
               <th>Material Name</th>
               <th>Price</th>
-           
             </tr>
           </thead>
           <tbody>
@@ -44,9 +45,13 @@ function SupplierDetailsModal({ isOpen, onClose, supplier }) {
               <tr key={detail.supDeliId}>
                 <td>{index + 1}</td>
                 <td>{detail.matName}</td>
-            
-                <td>₱ {detail.price}</td>
-              
+
+                <td>
+                  {new Intl.NumberFormat("en-PH", {
+                    style: "currency",
+                    currency: "PHP",
+                  }).format(detail.price)}
+                </td>
               </tr>
             ))}
           </tbody>

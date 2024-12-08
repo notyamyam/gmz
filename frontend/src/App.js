@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  Navigate,
+} from "react-router-dom";
 import LoginPortal from "./login/LoginPortal";
 import RegisterPortal from "./login/RegisterPortal";
 import SystemAdmin from "./login/SystemAdmin";
@@ -11,6 +17,10 @@ import SystemAdminRawMaterials from "./SystemAdmin/RawMats";
 import SystemAdminSupplier from "./SystemAdmin/Supplier";
 import SystemAdminAccountRoles from "./SystemAdmin/AccountRoles.js";
 import Tags from "./SystemAdmin/CategoryTable";
+import AdCourier from "./SystemAdmin/Courier.js";
+import MOP from "./SystemAdmin/MOP.js";
+import Reports from "./SystemAdmin/Reports.js";
+import CancelledAdmin from "./SystemAdmin/Cancelled.js";
 
 import DataAdmin from "./login/DataAdmin";
 import DataAdminDashboard from "./DataAdmin/Dashboard";
@@ -27,13 +37,16 @@ import SalesAdminOrder from "./SalesAdmin/Order";
 import PerparingOrders from "./SalesAdmin/PreparingOrders.js";
 import PreparedOrders from "./SalesAdmin/Prepared.js";
 import Ready from "./SalesAdmin/ReadyToGo.js";
-import Delivery from "./SalesAdmin/Delivery.js";
+import Delivery from "./SalesAdmin/Transit.js";
 import Sales from "./SalesAdmin/Sales.js";
 import Cancelled from "./SalesAdmin/Cancelled.js";
+import Declined from "./SalesAdmin/DeclineOrders.js";
 
+import CustomerDeclined from "./Customer/DeclineOrders.js";
 import CustomerDashboard from "./Customer/Dashboard.js";
 import CustomerOrders from "./Customer/Orders.js";
 import CustomerCancelled from "./Customer/Cancelled.js";
+import CustomerCompleted from "./Customer/CompletedOrders.js";
 
 const App = () => {
   const [userAccess, setUserAccess] = useState(null);
@@ -68,14 +81,15 @@ const App = () => {
     } else if (userAccess === "3") {
       return <SalesAdminDashboard />;
     } else if (userAccess === "4") {
-      return <CustomerDashboard />;
+      return <Navigate to="/customer/orders" replace />;
+      // return <CustomerOrders />;
     }
-    return <Navigate to="/" />; // Default redirect if access level is invalid
+    return <Navigate to="/" replace />; // Default redirect if access level is invalid
   };
 
   return (
     <div className="App">
-      <BrowserRouter>
+      <BrowserRouter basename={"/"}>
         <Routes>
           <Route path="/register" element={<RegisterPortal />} />
           <Route
@@ -153,6 +167,30 @@ const App = () => {
           <Route
             path="/system-admin/tags"
             element={<ProtectedRoute element={<Tags />} requiredAccess="1" />}
+          />
+          <Route
+            path="/system-admin/adcourier"
+            element={
+              <ProtectedRoute element={<AdCourier />} requiredAccess="1" />
+            }
+          />
+
+          <Route
+            path="/system-admin/mop"
+            element={<ProtectedRoute element={<MOP />} requiredAccess="1" />}
+          />
+
+          <Route
+            path="/system-admin/reports"
+            element={
+              <ProtectedRoute element={<Reports />} requiredAccess="1" />
+            }
+          />
+          <Route
+            path="/system-admin/cancelled"
+            element={
+              <ProtectedRoute element={<CancelledAdmin />} requiredAccess="1" />
+            }
           />
 
           {/* Protected routes for Data Admin (access === 2) */}
@@ -286,6 +324,12 @@ const App = () => {
               <ProtectedRoute element={<Cancelled />} requiredAccess="3" />
             }
           />
+          <Route
+            path="/sales-admin/declined"
+            element={
+              <ProtectedRoute element={<Declined />} requiredAccess="3" />
+            }
+          />
 
           {/* Route for user-specific dashboard */}
           <Route
@@ -317,10 +361,30 @@ const App = () => {
           />
 
           <Route
+            path="/customer/completed"
+            element={
+              <ProtectedRoute
+                element={<CustomerCompleted />}
+                requiredAccess="4"
+              />
+            }
+          />
+
+          <Route
             path="/customer/cancelled"
             element={
               <ProtectedRoute
                 element={<CustomerCancelled />}
+                requiredAccess="4"
+              />
+            }
+          />
+
+          <Route
+            path="/customer/declined"
+            element={
+              <ProtectedRoute
+                element={<CustomerDeclined />}
                 requiredAccess="4"
               />
             }

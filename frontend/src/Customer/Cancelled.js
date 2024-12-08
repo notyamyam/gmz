@@ -6,51 +6,82 @@ import style from "./Cancelled.module.css";
 import apiUrl from "../ApiUrl/apiUrl";
 import axios from "axios";
 
-function History() {
+function Cancelled() {
   const userId = localStorage.getItem("id"); // get ID of customer.;
 
-  const [orderProd, setOrderProd] = useState([]); // Fetch orders by
   const [viewOrder, setViewOrder] = useState([]); // Fetch products of order
 
   const [viewOrderModal, setViewOrderModal] = useState(false);
 
-  const [orderId, setOrderId] = useState("");
+  const [cancelledArr, setCancelledArr] = useState([]);
+  const [prodArr, setProdArr] = useState([]);
 
-  const openViewOrder = (order_id) => {
+  // Paginate the items based on currentPage
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [item, setItem] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+  const currentItems = searchQuery
+    ? filteredOrders.slice(indexOfFirstItem, indexOfLastItem)
+    : cancelledArr.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(
+    (searchQuery ? filteredOrders.length : cancelledArr.length) / itemsPerPage
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSearch = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(event.target.value);
+    if (query === "") {
+      setFilteredOrders([]); // Reset to show all data
+    } else {
+      const filtered = item.filter((item) => {
+        const orderId = item.order_id ? item.order_id.toLowerCase() : "";
+        const mop = item.mop ? item.mop.toLowerCase() : "";
+        const date = item.date ? item.date.toLowerCase() : "";
+        const remarks = item.remarks ? item.remarks.toLowerCase() : "";
+
+        const totalSumPrice = item.total_sum_price
+          ? item.total_sum_price.toString().toLowerCase()
+          : "";
+
+        return (
+          orderId.includes(query) ||
+          mop.includes(query) ||
+          date.includes(query) ||
+          remarks.includes(query) ||
+          totalSumPrice.includes(query)
+        );
+      });
+      setFilteredOrders(filtered);
+    }
+    setCurrentPage(1);
+  };
+
+  const openViewOrder = (products) => {
     setViewOrderModal(true);
-    setOrderId(order_id);
-    fetchOrderedProducts(order_id);
+    setProdArr(products);
   };
 
   const closeViewOrder = () => setViewOrderModal(false);
 
-  const fetchOrderedProducts = async (orderId) => {
+  const fetchCancelledOrders = async () => {
     try {
-      const res = await axios.post(`${apiUrl}/orders_products/`, {
-        userId,
-        orderId,
-      });
+      const res = await axios.get(`${apiUrl}/cancelled_orders/${userId}`);
+      setCancelledArr(res.data.res);
 
-      if (res.data.status === "success") {
-        setViewOrder(res.data.res);
-        console.log(res.data.res);
+      if (Array.isArray(res.data.res)) {
+        setCancelledArr(res.data.res);
+        setItem(res.data.res);
       } else {
-        throw new Error("No order products found.");
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const fetchOrdersCancelled = async () => {
-    try {
-      const res = await axios.get(
-        `${apiUrl}/orders_customer_cancelled/${userId}`
-      );
-      if (res.data.status === "success") {
-        setOrderProd(res.data.res);
-      } else {
-        throw new Error("No orders found.");
+        setCancelledArr([]);
+        setItem([]);
       }
     } catch (err) {
       console.log(err.message);
@@ -58,9 +89,10 @@ function History() {
   };
 
   useEffect(() => {
-    fetchOrdersCancelled();
-    fetchOrderedProducts();
-  }, []);
+    if (!searchQuery) {
+      fetchCancelledOrders();
+    }
+  }, [cancelledArr, searchQuery]);
 
   return (
     <div className="container1">
@@ -73,8 +105,20 @@ function History() {
               <strong>Cancelled Orders</strong>
             </h5>
           </div>
+          <div className="search-wrapper">
+            <label>
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+            </label>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search"
+              size="20"
+              value={searchQuery}
+              onChange={handleSearch}
+            />
+          </div>
         </div>
-
         <div className="table-list">
           <table className="table">
             <thead>
@@ -82,36 +126,30 @@ function History() {
                 <th>Order ID</th>
                 <th>Total Price</th>
                 <th>Date Order</th>
-                <th>Status</th>
+                <th>Reason</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {orderProd.length === 0 ? (
+              {cancelledArr.length === 0 ? (
                 <tr>
-                  <td colSpan="6">NO ORDERS PLACED.</td>
+                  <td colSpan="6">NO CANCELLED ORDER.</td>
                 </tr>
               ) : (
-                orderProd.map((product, index) => (
+                currentItems.map((cancelledArr, index) => (
                   <tr key={index}>
                     <td className="w-25 text-start align-middle">
-                      {product.order_id}
+                      {cancelledArr.order_id}
                     </td>
                     <td className="w-25 text-start align-middle">
                       {new Intl.NumberFormat("en-PH", {
                         style: "currency",
                         currency: "PHP",
-                      }).format(product.total_sum_price)}
+                      }).format(cancelledArr.total_sum_price)}
                     </td>
-                    <td className="align-middle">{product.date}</td>
-                    <td className="align-middle">
-                      <span
-                        className={`${
-                          style[`badge-${product.status.toLowerCase()}`]
-                        }`}
-                      >
-                        <strong>{product.status}</strong>
-                      </span>
+                    <td className="align-middle">{cancelledArr.date}</td>
+                    <td className="w-25 text-start align-middle">
+                      <strong>{cancelledArr.remarks}</strong>
                     </td>
 
                     <td className="align-middle">
@@ -119,7 +157,7 @@ function History() {
                         <button
                           className={`${style.buttonView} btn btn-primary d-flex align-items-center justify-content-center`}
                           onClick={() => {
-                            openViewOrder(product.order_id);
+                            openViewOrder(cancelledArr.products);
                           }}
                         >
                           <i
@@ -135,6 +173,24 @@ function History() {
             </tbody>
           </table>
         </div>
+        <div className="pagination">
+          <button
+            onClick={() => paginate(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Prev
+          </button>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => paginate(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+        </div>
+        F
       </div>
 
       {viewOrderModal && (
@@ -163,31 +219,31 @@ function History() {
                     </tr>
                   </thead>
                   <tbody>
-                    {viewOrder?.length === 0 ? (
+                    {prodArr?.length === 0 ? (
                       <tr>
                         <td colSpan="6">NO PRODUCTS FOUND.</td>
                       </tr>
                     ) : (
-                      viewOrder?.map((item, index) => (
+                      prodArr?.map((prodArr, index) => (
                         <tr key={index}>
                           <td className="w-25 text-start align-middle">
-                            {item.item_name}
+                            {prodArr.item_name}
                           </td>
                           <td className="w-25 text-start align-middle">
-                            {item.description}
+                            {prodArr.description}
                           </td>
                           <td className="align-middle">
                             {new Intl.NumberFormat("en-PH", {
                               style: "currency",
                               currency: "PHP",
-                            }).format(item.price)}
+                            }).format(prodArr.price)}
                           </td>
-                          <td className="align-middle">{item.quantity}</td>
+                          <td className="align-middle">{prodArr.quantity}</td>
                           <td className="align-middle">
                             {new Intl.NumberFormat("en-PH", {
                               style: "currency",
                               currency: "PHP",
-                            }).format(item.total_price)}
+                            }).format(prodArr.total_price)}
                           </td>
                         </tr>
                       ))
@@ -203,4 +259,4 @@ function History() {
   );
 }
 
-export default History;
+export default Cancelled;

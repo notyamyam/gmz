@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import '../css/style.css';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faUser } from '@fortawesome/free-solid-svg-icons';
-import apiUrl from '../ApiUrl/apiUrl';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import "../css/style.css";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBell, faUser } from "@fortawesome/free-solid-svg-icons";
+import apiUrl from "../ApiUrl/apiUrl";
 function Header() {
   const navigate = useNavigate();
   const [isNotificationOpen, setNotificationOpen] = useState(false);
@@ -12,15 +12,18 @@ function Header() {
   const notificationDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
 
+  const [username, setUsername] = useState(localStorage.getItem("username"));
+  const [isLogoutModalOpen, setLogoutModalOpen] = useState(false); // State for logout modal
+
   // Handles logout
-  async function handleLogout() {
-    try {
-      await axios.post(`${apiUrl}/auth/logout`);
-      navigate('/');
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  }
+  // async function handleLogout() {
+  //   try {
+  //     await axios.post(`${apiUrl}/auth/logout`);
+  //     navigate("/");
+  //   } catch (error) {
+  //     console.error("Error logging out:", error);
+  //   }
+  // }
 
   // Handles clicking outside dropdowns to close them
   useEffect(() => {
@@ -31,61 +34,83 @@ function Header() {
       ) {
         setNotificationOpen(false);
       }
-      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target)
+      ) {
         setUserDropdownOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
+  const handleLogoutConfirmation = () => {
+    localStorage.clear(); // Clear localStorage
+    window.location.reload(); // Reload the page to reset the session
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutModalOpen(false); // Close the modal
+  };
+
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
   return (
     <div className="header">
-      <div>Welcome back,<span className="username"> Username!</span></div>
+      <div>
+        Welcome back,<span className="username"> {username}</span>
+      </div>
       <div className="dropdown">
         <span className="role">Sales Admin</span>
 
         {/* Notification Button */}
-        <button
-          type="button"
-          className="icon-button"
-          id="notificationButton"
-          onClick={() => setNotificationOpen(!isNotificationOpen)}
-        >
-          <FontAwesomeIcon icon={faBell} />
-          <span className="icon-button-badge">1</span>
-        </button>
 
         {/* User Button */}
         <button
           type="button"
           className="icon-button"
           id="userButton"
-          onClick={() => setUserDropdownOpen(!isUserDropdownOpen)}
+          onClick={(e) => {
+            handleLogoutClick();
+          }}
         >
           <FontAwesomeIcon icon={faUser} />
         </button>
-
-        {/* Notification Dropdown */}
-        {isNotificationOpen && (
-          <div className="dropdown-notif" ref={notificationDropdownRef}>
-            <a href="#">Notification 1</a>
-            <a href="#">Notification 2</a>
-            <a href="#">Notification 3</a>
-          </div>
-        )}
-
-        {/* User Dropdown */}
-        {isUserDropdownOpen && (
-          <div className="dropdown-user" ref={userDropdownRef}>
-            <a href="#">Profile</a>
-            <a href="#">Settings</a>
-            <a href="#" onClick={handleLogout}>Log Out</a>
-          </div>
-        )}
       </div>
+
+      {isLogoutModalOpen && (
+        <div className="modal show" tabIndex="-1" style={{ display: "block" }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-body">
+                <h6>Are you sure you want to log out?</h6>
+              </div>
+              <div className="d-flex w-100 justify-content-end">
+                <button
+                  type="button"
+                  style={{ backgroundColor: "white", color: "gray" }}
+                  onClick={handleLogoutCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ backgroundColor: "red", color: "white" }}
+                  onClick={handleLogoutConfirmation}
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

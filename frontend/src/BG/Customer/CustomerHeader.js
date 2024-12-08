@@ -13,15 +13,9 @@ function Header() {
   const notificationDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
   const [username, setUsername] = useState(localStorage.getItem("username"));
+  const [isLogoutModalOpen, setLogoutModalOpen] = useState(false); // State for logout modal
+
   // Handles logout
-  async function handleLogout() {
-    try {
-      await axios.post(`${apiUrl}/auth/logout`);
-      navigate("/");
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  }
 
   // Handles clicking outside dropdowns to close them
   useEffect(() => {
@@ -46,34 +40,64 @@ function Header() {
     };
   }, []);
 
+  const handleLogoutConfirmation = () => {
+    localStorage.clear(); // Clear localStorage
+    window.location.reload(); // Reload the page to reset the session
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutModalOpen(false); // Close the modal
+  };
+
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
   return (
     <div className="header">
       <div>
         Welcome back,<span className="username"> {username}!</span>
       </div>
       <div className="dropdown">
-
         {/* User Button */}
         <button
           type="button"
           className="icon-button"
-          id="userButton"
-          onClick={() => setUserDropdownOpen(!isUserDropdownOpen)}
+          onClick={(e) => {
+            handleLogoutClick();
+          }}
         >
           <FontAwesomeIcon icon={faUser} />
         </button>
-
-        {/* User Dropdown */}
-        {isUserDropdownOpen && (
-          <div className="dropdown-user" ref={userDropdownRef}>
-            <a href="#">Profile</a>
-            <a href="#">Settings</a>
-            <a href="#" onClick={handleLogout}>
-              Log Out
-            </a>
-          </div>
-        )}
       </div>
+      {isLogoutModalOpen && (
+        <div className="modal show" tabIndex="-1" style={{ display: "block" }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-body">
+                <h6>Are you sure you want to log out?</h6>
+              </div>
+              <div className="d-flex w-100 justify-content-end">
+                <button
+                  type="button"
+                  style={{ backgroundColor: "white", color: "gray" }}
+                  onClick={handleLogoutCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ backgroundColor: "red", color: "white" }}
+                  onClick={handleLogoutConfirmation}
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

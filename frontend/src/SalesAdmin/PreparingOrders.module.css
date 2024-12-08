@@ -1,0 +1,39 @@
+.modalContent {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px; /* Softer, rounded corners */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    width: 80%;
+    height: 80%;
+    max-width: 80%; /*Slightly smaller for a neater look */
+    position: relative;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.modalAvailableVehicle {
+    background-color: red;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px; /* Softer, rounded corners */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    width: 80%;
+    height: 20%;
+    max-width: 80%; /*Slightly smaller for a neater look */
+    position: relative;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+
+.modal-overlayy {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }

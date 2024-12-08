@@ -78,10 +78,10 @@ function CategoryTable() {
 
   const renderTable = (categories, type) => (
     <div className="mb-5">
-      <h4 className="mb-3">{type}   </h4>
+      <h4 className="mb-3">{type} </h4>
       <table className="table table-striped table-hover">
         <thead className="table-dark">
-          <tr >
+          <tr>
             <th>#</th>
             <th>Category Name</th>
             <th>Actions</th>
@@ -128,7 +128,11 @@ function CategoryTable() {
       <div className="main-content">
         <div className="container-fluid">
           <div className="d-flex justify-content-between mb-3">
-            <h3>Categories</h3>
+            <div className="d-flex w-100 justify-content-start ">
+              <h4>
+                <strong style={{ color: "gray" }}>Tags / Categories</strong>
+              </h4>
+            </div>
             <button
               className="btn btn-primary"
               onClick={() => {
@@ -200,7 +204,9 @@ function CategoryTable() {
                       <option value="">Select Type</option>
                       <option value="Document">Document</option>
                       <option value="Legal">Legal</option>
-                      <option value="Contract">Contract</option>
+                      <option value="Contracts/Agreement">
+                        Contracts/Agreement
+                      </option>
                       <option value="Inventory">Inventory</option>
                       <option value="RawMaterial">Raw Material</option>
                     </select>

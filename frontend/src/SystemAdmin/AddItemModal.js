@@ -8,6 +8,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [threshold, setThreshold] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const [selectedMaterial, setSelectedMaterial] = useState("");
@@ -63,6 +64,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
         price,
         category,
         description,
+        threshold,
         materials: addedMaterials.map((mat) => mat.matId),
       };
       onAdd(newItem);
@@ -71,6 +73,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
       setDescription("");
       setCategory("");
       setSelectedMaterial("");
+      setThreshold("");
       setAddedMaterials([]);
       onClose();
     }
@@ -102,6 +105,16 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
               if (newValue >= 0 || newValue === "") {
                 setPrice(newValue);
               }
+            }}
+            required
+          />
+
+          <input
+            type="number"
+            placeholder="Threshold"
+            value={threshold}
+            onChange={(e) => {
+              setThreshold(e.target.value);
             }}
             required
           />
@@ -172,6 +185,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
                 setDescription("");
                 setCategory("");
                 setSelectedMaterial("");
+                setThreshold("");
                 setAddedMaterials([]);
                 onClose();
               }}

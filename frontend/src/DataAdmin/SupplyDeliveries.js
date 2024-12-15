@@ -44,7 +44,7 @@ function SupplyDeliveries() {
         .catch((err) => console.log(err));
 
       await axios
-        .get(`${apiUrl}/supDeli`)
+        .get(`${apiUrl}/orders/rawmats`)
         .then((res) => {
           setSupDeli(res.data);
         })
@@ -62,9 +62,12 @@ function SupplyDeliveries() {
   };
 
   const handlePlaceOrder = async (orderDetails) => {
-    // Send the order details to the server to place the order
     await axios
-      .post(`${apiUrl}/placeOrderDelivery`, orderDetails)
+      .post(`${apiUrl}/placeOrderDelivery`, {
+        ...orderDetails,
+        username: localStorage.getItem("username"),
+        access: localStorage.getItem("access"),
+      })
       .then((response) => {
         toast.success("Order placed.");
         fetchData();
@@ -80,10 +83,11 @@ function SupplyDeliveries() {
     e.preventDefault();
 
     try {
-      const response = await axios.post(
-        `${apiUrl}/updateOrderDelivery`,
-        updatedOrder
-      );
+      const response = await axios.post(`${apiUrl}/updateOrderDelivery`, {
+        ...updatedOrder,
+        username: localStorage.getItem("username"),
+        access: localStorage.getItem("access"),
+      });
       toast.success("Order updated.");
       fetchData();
     } catch (error) {
@@ -94,6 +98,9 @@ function SupplyDeliveries() {
     try {
       // Call the merged endpoint to update the item and potentially the order status
       const response = await axios.put(`${apiUrl}/updateItemAndOrderStatus`, {
+        username: localStorage.getItem("username"),
+        access: localStorage.getItem("access"),
+        matName: item.matName,
         orderItemId: item.orderItemId,
         receivedQuantity,
         orderId: item.orderId,
@@ -248,10 +255,7 @@ function SupplyDeliveries() {
             <table className="table table-bordered">
               <thead>
                 <tr>
-                  <th onClick={() => sortData("supplyId")}>#</th>
-                  <th onClick={() => sortData("supplyName")}>Supplier Name</th>
-
-                  <th onClick={() => sortData("totalQuantity")}>Quantity</th>
+                  <th onClick={() => sortData("orderId")}>Order Id</th>
                   <th onClick={() => sortData("totalCost")}>Cost</th>
                   <th onClick={() => sortData("status")}>Status</th>
                   <th onClick={() => sortData("orderDate")}>Date</th>
@@ -262,9 +266,7 @@ function SupplyDeliveries() {
                 {currentData?.map((delivery, index) => (
                   <tr key={index}>
                     <td>{delivery.orderId}</td>
-                    <td>{delivery.supplyName}</td>
 
-                    <td>{delivery.totalQuantity}</td>
                     <td>
                       {new Intl.NumberFormat("en-PH", {
                         style: "currency",
@@ -296,7 +298,8 @@ function SupplyDeliveries() {
                           className="done-btn"
                           style={{ backgroundColor: "red" }}
                           onClick={() => {
-                            setOrderedItems(delivery.productDetails);
+                            console.log(delivery.rawMats);
+                            setOrderedItems(delivery.rawMats);
                             setViewPrice(delivery.totalCost);
                             setIsView(true);
                           }}
@@ -389,6 +392,7 @@ function SupplyDeliveries() {
               <thead>
                 <tr>
                   <th>#</th>
+                  <th>Supplier</th>
                   <th>Material Name</th>
                   <th>Price</th>
                   <th> Ordered (qty) </th>
@@ -403,6 +407,7 @@ function SupplyDeliveries() {
                   orderedItems.map((order, index) => (
                     <tr key={index + 1}>
                       <td>{index + 1}</td>
+                      <td>{order.supplyName}</td>
                       <td>{order.matName}</td>
                       <td>
                         {new Intl.NumberFormat("en-PH", {
@@ -416,16 +421,16 @@ function SupplyDeliveries() {
                         {" "}
                         <span
                           className={`badge ${
-                            order.itemStatus == 1
+                            order.status == 1
                               ? "badge-completed"
-                              : order.itemStatus == 2
+                              : order.status == 2
                               ? "badge-cancelled"
                               : "badge-pending"
                           }`}
                         >
-                          {order.itemStatus == 1
+                          {order.status == 1
                             ? "Completed"
-                            : order.itemStatus == 2
+                            : order.status == 2
                             ? "Cancelled"
                             : "Pending"}
                         </span>
@@ -434,7 +439,7 @@ function SupplyDeliveries() {
                         {new Intl.NumberFormat("en-PH", {
                           style: "currency",
                           currency: "PHP",
-                        }).format(order.itemTotal)}
+                        }).format(order.totalCost)}
                       </td>
                       <td>
                         {" "}

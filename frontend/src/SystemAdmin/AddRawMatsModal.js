@@ -7,7 +7,7 @@ const AddRawMatsModal = ({ isOpen, onClose, onAdd }) => {
   const [matName, setMatName] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
-
+  const [threshold, setThreshold] = useState("");
   useEffect(() => {
     if (isOpen) {
       axios
@@ -23,10 +23,11 @@ const AddRawMatsModal = ({ isOpen, onClose, onAdd }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newMat = { matName, category }; // Include quantity in newMat
+    const newMat = { matName, category, threshold }; // Include quantity in newMat
     onAdd(newMat);
     setMatName("");
     setCategory("");
+    setThreshold("");
     onClose(); // Close the modal after adding
   };
 
@@ -60,6 +61,15 @@ const AddRawMatsModal = ({ isOpen, onClose, onAdd }) => {
               </option>
             ))}
           </select>
+          <input
+            type="number"
+            placeholder="Threshold"
+            value={threshold}
+            onChange={(e) => {
+              setThreshold(e.target.value);
+            }}
+            required
+          />
           <div className="d-flex flex-column gap-2">
             {" "}
             <button type="submit">Add Material</button>

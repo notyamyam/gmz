@@ -191,8 +191,8 @@ function Document() {
                   <tr key={doc.id}>
                     <td>{doc.documentName}</td>
                     <td>{doc.category}</td>
-                    <td>{moment(doc.dateEffective)?.format("YYYY-MM-DD")}</td>
-                    <td>{moment(doc.expirationDate)?.format("YYYY-MM-DD")}</td>
+                    <td>{doc.isNonExpiry == 1? "Not Applicable" : moment(doc.dateEffective)?.format("YYYY-MM-DD")}</td>
+                    <td>{doc.isNonExpiry == 1? "Not Applicable" : moment(doc.expirationDate)?.format("YYYY-MM-DD")}</td>
                     <td>{doc.description}</td>
                     <td
                       className="text-center align-middle"

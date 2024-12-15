@@ -27,7 +27,7 @@ function Header() {
     }
 
     try {
-      const response = await axios.get(`${apiUrl}/documents/getnotifications`);
+      const response = await axios.get(`${apiUrl}/documents/getnotifications/${access}`);
       setNotifications(response.data);
       setUnreadCount(
         response.data.filter((notif) => notif.status === 0).length
@@ -39,7 +39,7 @@ function Header() {
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [notifications]);
 
   // Handles clicking outside dropdowns to close them
   useEffect(() => {
@@ -103,7 +103,7 @@ function Header() {
 
         {/* Notification Button */}
         <button
-          hidden={access != 1}
+        
           type="button"
           className="icon-button"
           id="notificationButton"

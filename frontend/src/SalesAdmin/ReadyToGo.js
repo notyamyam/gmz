@@ -14,6 +14,8 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 function ReadyToGo() {
+  const [cusOrders, setCusOrders] = useState([]);
+
   //modal viewing of productss per order
   const [viewOrderModel, setViewOrderModel] = useState(false);
   const [viewProductModel, setViewProductModel] = useState(false);
@@ -78,7 +80,7 @@ function ReadyToGo() {
   const fetchCourierReady = async () => {
     try {
       const res = await axios.get(`${apiUrl}/courier_ready`); // Adjust the URL if necessary
-      console.log(res);
+      // console.log(res);
       if (Array.isArray(res.data.res)) {
         setCouriers(res.data.res);
         setItem(res.data.res);
@@ -117,9 +119,19 @@ function ReadyToGo() {
       const res = await axios.post(`${apiUrl}/status_transit/`, {
         plate,
       });
-      if (res.data.status === "success") {
+
+      const notif_transit = await axios.post(
+        `${apiUrl}/insert_notif_transit/`,
+        cusOrders
+      );
+
+      if (
+        res.data.status === "success" &&
+        notif_transit.data.status === "success"
+      ) {
         toast.success("Its on the way! See on TRANSIT");
         setViewOrderModel(false);
+        setCusOrders([]);
       } else {
         throw new Error("...");
       }
@@ -212,8 +224,14 @@ function ReadyToGo() {
                           <button
                             className={` btn btn-primary d-flex align-items-center justify-content-center`}
                             onClick={() => {
+                              couriers.orders.map((order) => {
+                                cusOrders.push({
+                                  customer_id: order.customer_id,
+                                  order_id: order.order_id,
+                                });
+                              });
                               openOrderModal(couriers.orders);
-                              setUserId(couriers.userId);
+                              setUserId(couriers.orders[0].customer_id);
                               setOrderId(couriers.order_id);
                               setRefNo(couriers.ref_no);
                               setTotalPrice(couriers.total_price);
@@ -263,7 +281,10 @@ function ReadyToGo() {
               <button
                 type="button"
                 className="btn-close bg-light"
-                onClick={(e) => setViewOrderModel(false)}
+                onClick={(e) => {
+                  setViewOrderModel(false);
+                  setCusOrders([]);
+                }}
               ></button>
             </div>
 

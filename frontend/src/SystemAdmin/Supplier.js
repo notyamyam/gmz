@@ -233,7 +233,7 @@ function Supplier() {
             </table>
           </div>
 
-          {/* Pagination */}
+ 
           <div className="pagination">
             <button
               onClick={() => paginate(currentPage - 1)}

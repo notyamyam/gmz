@@ -148,21 +148,28 @@ function Order() {
     }
   }, [pendingOrders, searchQuery]);
 
-  const handlePreparing = async (orderId) => {
+  const handlePreparing = async (orderId, userId) => {
     try {
       const res = await axios.post(`${apiUrl}/status_preparing/`, { orderId });
 
-      console.log("res:", res);
+      const res_notif = await axios.post(`${apiUrl}/insert_notif/`, {
+        orderId,
+        userId,
+      });
+      // console.log("res:", res);
 
-      if (res.status === 400) {
+      if (res.status === 400 && res_notif.status === 400) {
         let errorMessage = res.data.message;
 
         // Replace <br> with newline characters to make it compatible with the alert box
         errorMessage = errorMessage.replace(/<br>/g, "\n");
 
         // Display the message using the native alert
-        alert(errorMessage);
-      } else if (res.data.status === "success") {
+        alert("ASD:", errorMessage);
+      } else if (
+        res.data.status === "success" &&
+        res_notif.data.status === "success"
+      ) {
         toast.success("Order accepted, proceed to preparing.");
         setViewPendingModal(false);
         fetchPendingOrders();
@@ -174,27 +181,32 @@ function Order() {
         let errorMessage = error.response.data.message;
 
         // Replace <br> tags with newline characters
-        errorMessage = errorMessage.replace(/<br>/g, "\n");
+        // errorMessage = errorMessage.replace(/<br>/g, "\n");
 
-        alert(errorMessage);
+        alert("===>", error);
       } else {
-        console.log("==>", error);
-        alert("An error occurred while processing the order.");
+        // console.log("==>", error);
+        alert(error);
       }
     }
   };
 
   const handleDeclineOrder = async () => {
-    console.log("ORDER: ", orderId);
-    console.log("REMARKS: ", remarks);
-
     try {
       const res = await axios.post(`${apiUrl}/decline_order/`, {
         orderId,
         remarks,
       });
 
-      if (res.data.status === "success") {
+      const notif_decline = await axios.post(
+        `${apiUrl}/insert_notif_decline/`,
+        { orderId, userId }
+      );
+
+      if (
+        res.data.status === "success" &&
+        notif_decline.data.status === "success"
+      ) {
         toast.success("Order declined successfully.");
         setRemarks("");
         setReasonModal(false);
@@ -259,7 +271,9 @@ function Order() {
                   currentItems.map((pendingOrders, index) => (
                     <tr key={index}>
                       <td className="text-start align-middle ">
-                        <span className="me-2">{pendingOrders.order_id}</span>
+                        <span className="me-2">
+                          {pendingOrders.order_id} - {pendingOrders.customer_id}
+                        </span>
                         <strong className="me-2">
                           <i>{pendingOrders.mop}</i>
                         </strong>
@@ -289,7 +303,7 @@ function Order() {
                             className={` btn btn-primary d-flex align-items-center justify-content-center`}
                             onClick={() => {
                               openViewPendingOrders(pendingOrders.products);
-                              setUserId(pendingOrders.user_id);
+                              setUserId(pendingOrders.customer_id);
                               setOrderId(pendingOrders.order_id);
                               setRefNo(pendingOrders.ref_no);
                               setTotalPrice(pendingOrders.total_sum_price);
@@ -409,7 +423,7 @@ function Order() {
                   <button
                     className="btn btn-success"
                     onClick={() => {
-                      handlePreparing(orderId);
+                      handlePreparing(orderId, userId);
                     }}
                   >
                     Accept

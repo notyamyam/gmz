@@ -21,7 +21,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
   const [effectiveDate, setDateEffective] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [description, setDescription] = useState("");
-
+  const [isNonExpiry, setIsNonExpiry] = useState(false);
   // Fetch inventory categories from backend when the modal opens
   useEffect(() => {
     if (isOpen) {
@@ -61,7 +61,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
     formData.append("dateEffective", effectiveDate);
     formData.append("expirationDate", expirationDate);
     formData.append("description", description);
-
+    formData.append("isNonExpiry", isNonExpiry);
     await axios
       .post(`${apiUrl}/documents/upload`, formData, {
         headers: {
@@ -78,6 +78,7 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
         setDateEffective("");
         setExpirationDate("");
         setDescription("");
+        setIsNonExpiry(false);
         onClose();
       })
       .catch((error) => {
@@ -126,21 +127,39 @@ const AddDocumentModal = ({ isOpen, onClose, onAdd }) => {
               </option>
             ))}
           </select>
-          <label>Date Effective</label>
+
+          <div className="checkbox-container">
+            <input
+              type="checkbox"
+              id="nonExpiry"
+              checked={isNonExpiry}
+              onChange={(e) => {
+                setIsNonExpiry(e.target.checked);
+                if (e.target.checked) {
+                  setDateEffective(""); // Reset dates when non-expiry is selected
+                  setExpirationDate("");
+                }
+              }}
+            />
+            <label htmlFor="nonExpiry">Non-Expiry Document</label>
+          </div>
+          <label   hidden={isNonExpiry} >Date Effective</label>
           <input
             type="date"
+            hidden={isNonExpiry}
             placeholder="Date Uploaded"
             value={effectiveDate}
             onChange={(e) => setDateEffective(e.target.value)}
-            required
+            required={!isNonExpiry}
           />
-          <label>Date expiry</label>
+          <label   hidden={isNonExpiry}>Date expiry</label>
           <input
             type="date"
+            hidden={isNonExpiry}
             placeholder="Expiration Date"
             value={expirationDate}
             onChange={(e) => setExpirationDate(e.target.value)}
-            required
+            required={!isNonExpiry}
           />
           <label>Description</label>
           <textarea

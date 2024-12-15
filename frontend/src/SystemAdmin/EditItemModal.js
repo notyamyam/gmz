@@ -8,19 +8,20 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate }) => {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [threshold, setThreshold] = useState("");
   const [categories, setCategories] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [materialList, setMaterialList] = useState([]);
   const [selectedMaterial, setSelectedMaterial] = useState("");
 
   useEffect(() => {
-    console.log(item);
     if (item) {
       setItemName(item.itemName);
       setPrice(item.price);
       setCategory(item.category);
       setDescription(item.description);
       setMaterials(item.materials || []);
+      setThreshold(item.threshold_low);
     }
   }, [item]);
 
@@ -77,6 +78,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate }) => {
       price,
       category,
       description,
+      threshold,
       materials: materials.map((mat) => mat.matId), // Send only material IDs
     };
 
@@ -107,6 +109,15 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate }) => {
               if (newValue >= 0 || newValue === "") {
                 setPrice(newValue);
               }
+            }}
+            required
+          />
+          <input
+            type="number"
+            placeholder="Threshold"
+            value={threshold}
+            onChange={(e) => {
+              setThreshold(e.target.value);
             }}
             required
           />

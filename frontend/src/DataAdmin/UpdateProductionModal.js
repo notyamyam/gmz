@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify"; // Import toast and ToastContainer
-import "react-toastify/dist/ReactToastify.css"; // Import toast styles
+
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "../css/AddItemModal.css"; // You can style your modal here
 import apiUrl from "../ApiUrl/apiUrl";
 
@@ -45,7 +46,7 @@ function UpdateProductionModal({
           );
           console.log("Fetched production data:", response.data);
 
-          const productionData = response.data[0] || {}; // If response is an array, access the first element
+          const productionData = response.data[0] || {};
           if (!productionData) {
             console.log("No production data found");
             return;
@@ -68,8 +69,13 @@ function UpdateProductionModal({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    console.log(`Handling change for ${name}: ${value}`);
     setProduction((prevState) => ({ ...prevState, [name]: value }));
+  };
+
+  const handleChangeWithName = (e) => {
+    const { name, value } = e.target;
+    const item = items.find((item) => item.itemId == value);
+    setProduction((prevState) => ({ ...prevState, itemName: item.itemName }));
   };
 
   const handleSubmit = async (e) => {
@@ -77,8 +83,14 @@ function UpdateProductionModal({
     console.log("Submitting production update:", production);
     try {
       await axios
-        .put(`${apiUrl}/updateProduction/${productionId}`, production)
+        .put(`${apiUrl}/updateProduction/${productionId}`, {
+          ...production,
+          username: localStorage.getItem("username"),
+          access: localStorage.getItem("access"),
+        })
         .then((res) => {
+          console.log(res.data);
+
           toast.success("Production record updated successfully!");
           onUpdate(); // Refresh the data after update
           onClose(); // Close the modal
@@ -96,7 +108,6 @@ function UpdateProductionModal({
   return (
     isOpen && (
       <>
-        <ToastContainer position="top-right" autoClose={3000} />
         <div id="addModal" className="modal-overlay">
           <div className="modal-content">
             <span className="close" onClick={onClose}>
@@ -110,7 +121,10 @@ function UpdateProductionModal({
                 <select
                   name="itemId"
                   value={production.itemId}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    handleChange(e);
+                    handleChangeWithName(e);
+                  }}
                   required
                 >
                   <option value="">Select an item</option>
@@ -167,6 +181,7 @@ function UpdateProductionModal({
               </div>
             )}
           </div>
+          <ToastContainer position="top-right" autoClose={3000} />
         </div>
       </>
     )

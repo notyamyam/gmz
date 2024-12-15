@@ -13,7 +13,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
   const [expirationDate, setExpirationDate] = useState("");
   const [effectiveDate, setDateEffective] = useState("");
   const [description, setDescription] = useState("");
-
+  const [isNonExpiry, setIsNonExpiry] = useState(false);
   const formatDate = (date) => {
     if (!date) return ""; // Handle empty or null dates
     const d = new Date(date);
@@ -27,7 +27,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
       setExpirationDate(formatDate(document.expirationDate) || "");
       setDateEffective(formatDate(document.dateEffective) || "");
       setDescription(document.description || "");
-
+      setIsNonExpiry(document.isNonExpiry || "");
       // Fetch categories
       axios
         .get(`${apiUrl}/categories/document`)
@@ -53,7 +53,9 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
     if (!document) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to ${document.isArchive == 1? 'Unarchive' : 'Archive'} the document "${document.documentName}"?`
+      `Are you sure you want to ${
+        document.isArchive == 1 ? "Unarchive" : "Archive"
+      } the document "${document.documentName}"?`
     );
 
     if (!confirmed) return;
@@ -91,7 +93,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
     formData.append("dateEffective", effectiveDate);
     formData.append("expirationDate", expirationDate);
     formData.append("description", description);
-
+    formData.append("isNonExpiry", isNonExpiry);
     try {
       await axios.put(`${apiUrl}/documents/${document.id}`, formData, {
         headers: {
@@ -118,7 +120,7 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
           <button
             hidden={document.status !== 0}
             className="btn"
-            style={{backgroundColor: "orange" , color: "white"}}
+            style={{ backgroundColor: "orange", color: "white" }}
             type="button"
             onClick={handleArchive}
           >
@@ -156,21 +158,40 @@ const EditDocumentModal = ({ isOpen, onClose, onEdit, document }) => {
               </option>
             ))}
           </select>
-          <label>New Effective Date</label>
+
+          <div className="checkbox-container">
+            <input
+              type="checkbox"
+              id="nonExpiry"
+              checked={isNonExpiry}
+              onChange={(e) => {
+                setIsNonExpiry(e.target.checked);
+                if (e.target.checked) {
+                  setDateEffective(""); // Reset dates when non-expiry is selected
+                  setExpirationDate("");
+                }
+              }}
+            />
+            <label htmlFor="nonExpiry">Non-Expiry Document</label>
+          </div>
+
+          <label hidden={isNonExpiry}>New Effective Date</label>
           <input
+            hidden={isNonExpiry}
             type="date"
             placeholder="Effective Date"
             value={effectiveDate}
             onChange={(e) => setDateEffective(e.target.value)}
-            required
+            required={!isNonExpiry}
           />
-          <label>New Expiration Date</label>
+          <label hidden={isNonExpiry}>New Expiration Date</label>
           <input
+            hidden={isNonExpiry}
             type="date"
             placeholder="Expiration Date"
             value={expirationDate}
             onChange={(e) => setExpirationDate(e.target.value)}
-            required
+            required={!isNonExpiry}
           />
           <label>Description</label>
           <textarea

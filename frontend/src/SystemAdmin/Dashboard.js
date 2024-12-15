@@ -160,7 +160,7 @@ function Dashboard() {
       colors: ["transparent"],
     },
     xaxis: {
-      categories: chartData.map(
+      categories: chartData?.map(
         (item) => `${item.matName} (${item.supplyName})`
       ), // Material Name (Supplier Name)
     },
@@ -191,7 +191,7 @@ function Dashboard() {
   const chartSeries = [
     {
       name: "Total Ordered",
-      data: chartData.map((item) => item.totalOrdered), // Total Ordered Quantity
+      data: chartData?.map((item) => item.totalOrdered), // Total Ordered Quantity
     },
   ];
 
@@ -216,7 +216,7 @@ function Dashboard() {
       colors: ["transparent"],
     },
     xaxis: {
-      categories: chartDataMostSoldProduct.map((item) => `${item.item_name}`), // Material Name (Supplier Name)
+      categories: chartDataMostSoldProduct?.map((item) => `${item.item_name}`), // Material Name (Supplier Name)
     },
     yaxis: {
       title: {
@@ -245,7 +245,7 @@ function Dashboard() {
   const chartSeriesMostSoldProduct = [
     {
       name: "Total Sales",
-      data: chartDataMostSoldProduct.map((item) => item.TOTALSALES), // Total Ordered Quantity
+      data: chartDataMostSoldProduct?.map((item) => item.TOTALSALES), // Total Ordered Quantity
     },
   ];
 
@@ -270,7 +270,7 @@ function Dashboard() {
       colors: ["transparent"],
     },
     xaxis: {
-      categories: chartDataLeastSoldProduct.map((item) => `${item.item_name}`), // Material Name (Supplier Name)
+      categories: chartDataLeastSoldProduct?.map((item) => `${item.item_name}`), // Material Name (Supplier Name)
     },
     yaxis: {
       title: {
@@ -299,7 +299,7 @@ function Dashboard() {
   const chartSeriesLeastSoldProduct = [
     {
       name: "Total Sales",
-      data: chartDataLeastSoldProduct.map((item) => item.TOTALSALES), // Total Ordered Quantity
+      data: chartDataLeastSoldProduct?.map((item) => item.TOTALSALES), // Total Ordered Quantity
     },
   ];
 
@@ -363,7 +363,7 @@ function Dashboard() {
 
   const getPaginatedData = (data) => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    return data?.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   };
 
   const handlePageChange = (direction, dataLength) => {
@@ -465,7 +465,7 @@ function Dashboard() {
           </div>
           <div className="row mt-4">
             {/* Cards */}
-            {Object.keys(details).map((key, index) => (
+            {Object.keys(details)?.map((key, index) => (
               <div
                 key={index}
                 className="col-md-4 mb-4"
@@ -627,9 +627,9 @@ function Dashboard() {
                   <tr>
                     {Object.keys(
                       details[pinnedCard || hoveredCard]?.[0] || {}
-                    ).map((key) => (
+                    )?.map((key) => (
                       <th key={key}>
-                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                        {key.charAt(0).toUpperCase() + key?.slice(1)}
                       </th>
                     ))}
                   </tr>
@@ -637,9 +637,9 @@ function Dashboard() {
                 <tbody>
                   {getPaginatedData(
                     details[pinnedCard || hoveredCard] || []
-                  ).map((item, index) => (
+                  )?.map((item, index) => (
                     <tr key={index}>
-                      {Object.values(item).map((value, idx) => (
+                      {Object.values(item)?.map((value, idx) => (
                         <td key={idx}>
                           {typeof value === "object"
                             ? JSON.stringify(value, null, 2) // Render object as string

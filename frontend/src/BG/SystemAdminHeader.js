@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, act } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../css/style.css";
@@ -13,6 +13,7 @@ function Header() {
   const [isLogoutModalOpen, setLogoutModalOpen] = useState(false); // State for logout modal
   const notificationDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
+  const [ access , setAccess] = useState(localStorage.getItem("access"))
   const [username, setUsername] = useState(localStorage.getItem("username"));
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -26,7 +27,7 @@ function Header() {
     }
 
     try {
-      const response = await axios.get(`${apiUrl}/documents/getnotifications`);
+      const response = await axios.get(`${apiUrl}/documents/getnotifications/${access}`);
       setNotifications(response.data);
       setUnreadCount(
         response.data.filter((notif) => notif.status === 0).length

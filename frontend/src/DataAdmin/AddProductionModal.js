@@ -17,10 +17,20 @@ function AddProductionModal({ isOpen, onClose, items, onAdd }) {
     setProduction((prevState) => ({ ...prevState, [name]: value }));
   };
 
+  const handleChangeWithName = (e) => {
+    const { name, value } = e.target;
+    const item = items.find((item) => item.itemId == value);
+    setProduction((prevState) => ({ ...prevState, itemName: item.itemName }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post(`${apiUrl}/produce`, production);
+      const response = await axios.post(`${apiUrl}/produce`, {
+        ...production,
+        username: localStorage.getItem("username"),
+        access: localStorage.getItem("access"),
+      });
       toast.success(response.data.message);
       onAdd(); // Refresh data
       setProduction({
@@ -54,7 +64,10 @@ function AddProductionModal({ isOpen, onClose, items, onAdd }) {
             <select
               name="itemId"
               value={production.itemId}
-              onChange={handleChange}
+              onChange={(e) => {
+                handleChange(e);
+                handleChangeWithName(e);
+              }}
               required
             >
               <option value="">Select an item</option>

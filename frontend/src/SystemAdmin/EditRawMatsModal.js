@@ -8,12 +8,13 @@ const EditRawMatsModal = ({ isOpen, onClose, mats, onUpdate }) => {
   const [quantity, setQuantity] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]); // State to track errors
-
+  const [threshold, setThreshold] = useState("");
   useEffect(() => {
     if (mats) {
       setMatName(mats.matName || "");
       setQuantity(mats.quantity || "");
       setCategory(mats.category || "");
+      setThreshold(mats.threshold_low);
     }
   }, [mats]);
 
@@ -33,7 +34,7 @@ const EditRawMatsModal = ({ isOpen, onClose, mats, onUpdate }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const updatedMat = { ...mats, matName, quantity, category };
+    const updatedMat = { ...mats, matName, quantity, category, threshold };
     onUpdate(updatedMat);
     onClose();
   };
@@ -68,6 +69,15 @@ const EditRawMatsModal = ({ isOpen, onClose, mats, onUpdate }) => {
               </option>
             ))}
           </select>
+          <input
+            type="number"
+            placeholder="Threshold"
+            value={threshold}
+            onChange={(e) => {
+              setThreshold(e.target.value);
+            }}
+            required
+          />
           <div className="d-flex flex-column gap-2">
             {" "}
             <button type="submit">Update Material</button>

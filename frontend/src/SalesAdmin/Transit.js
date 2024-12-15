@@ -14,6 +14,7 @@ function Transit() {
   const [userId, setUserId] = useState("");
 
   const [orderId, setOrderId] = useState("");
+  const [cusOrders, setCusOrders] = useState([]);
 
   const [refNo, setRefNo] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
@@ -120,7 +121,7 @@ function Transit() {
     if (!searchQuery) {
       fetchTransit();
     }
-  }, [transit, searchQuery]);
+  }, [ searchQuery]);
 
   const openModalShowOrder = (data) => {
     console.log("==>", data);
@@ -145,12 +146,19 @@ function Transit() {
   };
 
   const handleInsertSales = async (plate) => {
-    console.log("===> plate: ", plate);
     try {
       const res = await axios.post(`${apiUrl}/insertSales`, { plate });
-      console.log(res.data.status);
-      if (res.data.status === "success") {
+      
+      const notif_done = await axios.post(
+        `${apiUrl}/insert_notif_done/`,
+        cusOrders
+      );
+
+      if ( 
+        notif_done.data.status === "success"
+      ) {
         toast.success(res.data.message);
+        setCusOrders([]);
       } else {
         toast.error(res.data.message);
       }
@@ -193,7 +201,10 @@ function Transit() {
               <button
                 type="button"
                 className="btn btn-danger btn-sm "
-                onClick={() => handleOpenCourierDone()}
+                onClick={() => {
+                  
+                  handleOpenCourierDone();
+                }}
               >
                 <i
                   className="fa fa-check me-1"
@@ -259,6 +270,14 @@ function Transit() {
                             style={{ backgroundColor: "blue" }}
                             onClick={() => {
                               console.log("plate: ", transit.vehicle_plate);
+                              console.log(transit.orders);
+
+                              transit.orders.map((order) => {
+                                cusOrders.push({
+                                  customer_id: order.customer_id,
+                                  order_id: order.order_id,
+                                });
+                              });
                               openConfirm(transit.vehicle_plate);
                             }}
                           >

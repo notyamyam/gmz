@@ -6,10 +6,11 @@ import Sidebar from "../BG/DataAdminSidebar";
 import AddProductionModal from "./AddProductionModal"; // Add production modal
 import UpdateProductionModal from "./UpdateProductionModal"; // Update production modal
 import ViewMaterialsModal from "./ViewMaterialsModal";
+import "react-toastify/dist/ReactToastify.css"; // Required CSS for toast
 import DeleteModal from "./DeleteModal"; // Import DeleteModal component
 import { ToastContainer, toast } from "react-toastify";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import "react-toastify/dist/ReactToastify.css"; // Required CSS for toast
+
 import apiUrl from "../ApiUrl/apiUrl";
 import DoneModal from "./DoneModal";
 
@@ -59,12 +60,17 @@ function Production() {
   const deleteItem = async (id) => {
     try {
       await axios
-        .delete(`${apiUrl}/production/${id}`)
+        .delete(
+          `${apiUrl}/production/${id}/${localStorage.getItem(
+            "username"
+          )}/${localStorage.getItem("access")}`
+        )
         .then((res) => {
           fetchData();
           toast.success("Production item deleted successfully!"); // Show success toast
         })
         .catch((err) => {
+          console.log(err);
           toast.error(err.response.data.message);
         });
     } catch (error) {
@@ -79,6 +85,10 @@ function Production() {
     }
     setDeleteModalOpen(false); // Close the modal after deletion
     setItemToDelete(null); // Clear the item to delete
+  };
+
+  const handleUpdate = () => {
+    toast.success("Production record updated successfully!");
   };
 
   const confirmDeleteItem = (item) => {
@@ -157,7 +167,11 @@ function Production() {
     try {
       const response = await axios.put(
         `${apiUrl}/production/complete/${item.productionId}`,
-        { producedQuantity }
+        {
+          access: localStorage.getItem("access"),
+          username: localStorage.getItem("username"),
+          producedQuantity,
+        }
       );
       fetchData();
       toast.success("Successed");
@@ -321,7 +335,10 @@ function Production() {
         onClose={() => setUpdateModalOpen(false)}
         items={items}
         productionId={selectedProductionId}
-        onUpdate={fetchData} // Refresh data after update
+        onUpdate={() => {
+          fetchData();
+          handleUpdate();
+        }} // Refresh data after update
       />
 
       <DoneModal
@@ -344,7 +361,7 @@ function Production() {
         onAdd={fetchData} // Refresh data after adding
       />
 
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer />
     </div>
   );
 }
